@@ -304,7 +304,7 @@ function CanvasLinkChip({ lane, session }: { lane: Lane; session: Session }) {
         setState("busy");
         try {
           await addBoardLinkToCanvas(session.relay, session.signer, lane.channelId!,
-            laneBoardUrl(window.location.origin, lane));
+            laneBoardUrl(window.location.origin, lane), lane.owner, lane.repoId);
           setState("done");
           setTimeout(() => setState("idle"), 2000);
         } catch (err) {

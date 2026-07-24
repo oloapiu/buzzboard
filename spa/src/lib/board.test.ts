@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  assignCard, attachChannel, cardOrder, createCard, createLane, fetchBoard,
-  githubSlug, mergeBoardLink, moveCard, type Card, type Lane,
+  assignCard, attachChannel, boardCanvasBlock, cardOrder, createCard, createLane,
+  fetchBoard, githubSlug, mergeBoardBlock, moveCard, type Card, type Lane,
 } from "./board.ts";
 import { parsePrivateKey, Signer, type SignedEvent } from "./nostr.ts";
 
@@ -273,19 +273,37 @@ describe("githubSlug", () => {
   });
 });
 
-describe("mergeBoardLink", () => {
+describe("canvas board block", () => {
+  const block = (url: string) => boardCanvasBlock(url, OWNER, "widgets");
   const url = "http://localhost:8401/#lane-widgets";
-  it("appends without clobbering, idempotently, and updates its own line only", () => {
-    const fresh = mergeBoardLink("", url);
+
+  it("teaches agents the triage-labelled create command", () => {
+    const b = block(url);
+    expect(b).toContain(`--repo-owner ${OWNER} --repo-id widgets`);
+    expect(b).toContain("--label triage");
+    expect(b).toContain(`[Open buzzboard](${url})`);
+  });
+
+  it("appends without clobbering, idempotently, replacing only its own block", () => {
+    const fresh = mergeBoardBlock("", block(url));
     expect(fresh).toContain("[Open buzzboard]");
-    const appended = mergeBoardLink("# Notes\n\nImportant.", url);
+    const appended = mergeBoardBlock("# Notes\n\nImportant.", block(url));
     expect(appended.startsWith("# Notes\n\nImportant.")).toBe(true);
-    expect(mergeBoardLink(appended, url)).toBe(appended);
-    const moved = mergeBoardLink(appended, "http://localhost:9999/x");
+    expect(mergeBoardBlock(appended, block(url))).toBe(appended);
+    const moved = mergeBoardBlock(appended, block("http://localhost:9999/x"));
     expect(moved).toContain("Important.");
     expect(moved).toContain(":9999");
     expect(moved).not.toContain(":8401");
     expect(moved.split("Open buzzboard")).toHaveLength(2);
+  });
+
+  it("upgrades a legacy single-line link in place", () => {
+    const legacy = "# Notes\n\n📋 [Open buzzboard](http://old.example)\n\nMore notes.";
+    const upgraded = mergeBoardBlock(legacy, block(url));
+    expect(upgraded).toContain("More notes.");
+    expect(upgraded).not.toContain("old.example");
+    expect(upgraded).toContain("--label triage");
+    expect(upgraded.split("Open buzzboard")).toHaveLength(2);
   });
 });
 
@@ -363,6 +381,7 @@ describe("actions", () => {
     expect(member.tags).toContainEqual(["p", AGENT]);
     expect(member.tags).toContainEqual(["role", "bot"]);
     expect(canvas.content).toContain("#lane-my-lane");
+    expect(canvas.content).toContain("--label triage"); // agents learn the filing command
     expect(ann.tags).toContainEqual(["d", "my-lane"]); // slugified
     expect(ann.tags).toContainEqual(["buzz-channel", channelId]);
     expect(ann.tags).toContainEqual(["web", "https://github.com/acme/widgets"]);

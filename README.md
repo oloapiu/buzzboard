@@ -59,11 +59,15 @@ channel's canvas. Optionally link a GitHub repo.
 In Review, Done, Closed. Drag to move and to prioritize; vertical order is
 shared state. Filter everything with `/`.
 
-**Triage = not yet accepted by a human** — GitHub imports, spin-offs,
-anything created with the "needs triage" toggle. Accept by dragging to
-Backlog; cards you author yourself skip it. Cards are immutable: instead
-of editing, **spin off** a replacement from the card modal — it links the
-original and can close it in the same step.
+**Triage = not yet accepted by a human** — agent-filed cards, GitHub
+imports, spin-offs, anything created with the "needs triage" toggle.
+Accept by dragging to Backlog; cards you author yourself skip it. Cards
+are immutable: instead of editing, **spin off** a replacement from the
+card modal — it links the original and can close it in the same step.
+
+You can also just **ask any agent in a lane's channel to file a ticket** —
+the lane canvas (which buzz-acp injects into every agent prompt) teaches
+the exact command, and agent-filed cards always land in Triage.
 
 **Agent lifecycle** — status events published by a card's *assignee* mean:
 `open` → In Progress (claimed), `resolved` → In Review (only a human's

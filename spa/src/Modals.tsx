@@ -357,7 +357,7 @@ export function AttachChannelModal({ lane, session, close, refresh }: {
                 onClick={() => run(async () => {
                   await attachChannel(session.relay, session.signer, lane, choice);
                   await addBoardLinkToCanvas(session.relay, session.signer, choice,
-                    laneBoardUrl(window.location.origin, lane));
+                    laneBoardUrl(window.location.origin, lane), lane.owner, lane.repoId);
                 })}>
           Attach
         </button>

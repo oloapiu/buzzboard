@@ -460,7 +460,8 @@ export async function createLane(
       ));
     }
     if (boardOrigin) {
-      await addBoardLinkToCanvas(relay, signer, channelId, laneBoardUrl(boardOrigin, { repoId }));
+      await addBoardLinkToCanvas(relay, signer, channelId,
+        laneBoardUrl(boardOrigin, { repoId }), signer.pubkey, repoId);
     }
   }
   const slug = githubUrl ? githubSlug(githubUrl) : null;
@@ -483,27 +484,55 @@ export async function createLane(
   }
 }
 
-// --- channel canvas board link ---
+// --- channel canvas board block ---
 // The lane channel's canvas (kind 40100, a human-facing markdown doc rendered
-// by the buzz desktop) gets one "Open buzzboard" line. localhost links are
-// per-viewer: each colleague's click opens their own local board instance.
+// by the buzz desktop) gets a marker-delimited buzzboard block: the board
+// link (localhost links are per-viewer — each colleague's click opens their
+// own local instance) plus the card-filing instruction for agents. buzz-acp
+// injects the canvas into every agent prompt in the channel, so any agent
+// asked "file a ticket for this" in chat ambiently knows the command — and
+// always uses --label triage, so chat-created cards wait for human
+// acceptance in the Triage column.
 
-export function mergeBoardLink(current: string, boardUrl: string): string {
-  const line = `📋 [Open buzzboard](${boardUrl})`;
-  if (current.includes("Open buzzboard](")) {
-    return current.replace(/^.*Open buzzboard\]\(.*$/m, line);
+const BLOCK_START = "<!-- buzzboard -->";
+const BLOCK_END = "<!-- /buzzboard -->";
+
+export function boardCanvasBlock(boardUrl: string, owner: string, repoId: string): string {
+  return [
+    BLOCK_START,
+    `📋 [Open buzzboard](${boardUrl})`,
+    "",
+    "🤖 Agents: to file a ticket for this lane, run",
+    `\`buzz issues create --repo-owner ${owner} --repo-id ${repoId} ` +
+      `--title "<title>" --content "<details>" --label triage\``,
+    "Always include `--label triage` — new cards wait in the board's **Triage** " +
+      "column until a human accepts them.",
+    BLOCK_END,
+  ].join("\n");
+}
+
+export function mergeBoardBlock(current: string, block: string): string {
+  if (current.includes(BLOCK_START) && current.includes(BLOCK_END)) {
+    const start = current.indexOf(BLOCK_START);
+    const end = current.indexOf(BLOCK_END) + BLOCK_END.length;
+    return current.slice(0, start) + block + current.slice(end);
   }
-  return current ? `${current.trimEnd()}\n\n${line}\n` : `${line}\n`;
+  if (current.includes("Open buzzboard](")) {
+    // upgrade the pre-block single-line link
+    return current.replace(/^.*Open buzzboard\]\(.*$/m, block);
+  }
+  return current ? `${current.trimEnd()}\n\n${block}\n` : `${block}\n`;
 }
 
 export async function addBoardLinkToCanvas(
   relay: Relay, signer: Signer, channelId: string, boardUrl: string,
+  owner: string, repoId: string,
 ): Promise<void> {
   const events = await relay.query([
     { kinds: [K.KIND_CANVAS], "#h": [channelId], limit: 1 },
   ]);
   const current = events[0]?.content ?? "";
-  const next = mergeBoardLink(current, boardUrl);
+  const next = mergeBoardBlock(current, boardCanvasBlock(boardUrl, owner, repoId));
   if (next === current) return;
   await relay.submit(signer.signEvent(K.KIND_CANVAS, [["h", channelId]], next));
 }
