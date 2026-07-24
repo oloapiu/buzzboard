@@ -41,6 +41,13 @@ but the board-side protocol conventions (documented below) may still shift.
 ## Quickstart
 
 ```bash
+npx buzzboard          # serve locally + open the browser
+npx buzzboard --demo   # fake data + simulated agents, no relay needed
+```
+
+Hacking on it instead:
+
+```bash
 git clone https://github.com/oloapiu/buzzboard && cd buzzboard/spa
 npm install
 npm run dev        # http://localhost:8401
