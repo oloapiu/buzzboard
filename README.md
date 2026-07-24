@@ -118,6 +118,22 @@ There is no shared deployment, no accounts, no sync service — the relay is
 the single source of truth and its membership is the access control. What
 one person drags, everyone sees on the next 5-second poll.
 
+## Tests
+
+```bash
+cd spa && npm test    # vitest
+```
+
+The domain layer is pure logic over plain event objects, so the suite runs
+against an in-memory stub relay with a real filter matcher — no mocking
+framework. Covered: rank fractional-index invariants, the full column
+derivation matrix (strict vs loose actors, assignee lifecycle, blocked,
+label fallbacks, newest-wins recovery, `#a`+`#e` status merge), sync-agent
+authority + GitHub cross-link extraction, canvas link merging, and every
+action builder's published event kinds/tags (moves, assignment + dispatch,
+card mirror requests, lane creation, channel attach). Crypto is verified
+end-to-end: event ids, BIP-340 signatures, NIP-98 headers.
+
 ## Known limitations
 
 - Issue title/body are immutable after creation (NIP-34 has no issue edit);
