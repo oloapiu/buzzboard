@@ -152,6 +152,11 @@ svg { width: 1em; height: 1em; flex-shrink: 0; }
   border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
+.logo { display: inline-flex; color: var(--primary); }
+.logo svg { width: 1.5rem; height: auto; }
+.brand .logo { margin-right: -0.15rem; }
+.settings-brand { color: var(--primary); margin-bottom: 0.6rem; }
+.settings-brand svg { width: 3.2rem; height: auto; }
 .wordmark { font-weight: 700; font-size: 1.02rem; letter-spacing: -0.02em; }
 .wordmark em { font-style: normal; color: var(--primary); }
 .brand-sep { width: 1px; height: 1.1rem; background: var(--border-strong); }

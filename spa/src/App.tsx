@@ -3,7 +3,7 @@ import "./app.css";
 import { Board } from "./Board";
 import { cardOrder, fetchBoard, type BoardData } from "./lib/board";
 import type { Column } from "./lib/kinds";
-import { GearIcon, UsersIcon } from "./Icons";
+import { GearIcon, LogoIcon, UsersIcon } from "./Icons";
 import { parsePrivateKey, Signer } from "./lib/nostr";
 import { Relay } from "./lib/relay";
 
@@ -73,6 +73,7 @@ export default function App() {
   if (editing || !session) {
     return (
       <main className="settings">
+        <div className="settings-brand"><LogoIcon /></div>
         <h1>buzzboard</h1>
         <p className="muted">
           A kanban over your buzz community. Your key stays in this browser.
@@ -108,6 +109,7 @@ export default function App() {
     <div>
       <header className="topbar">
         <div className="brand">
+          <span className="logo"><LogoIcon /></span>
           <span className="wordmark"><em>buzz</em>board</span>
           <span className="brand-sep" aria-hidden />
           <span className="community" title={relayUrl}>
