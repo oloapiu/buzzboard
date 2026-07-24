@@ -123,13 +123,15 @@ export function Board({ data, session, refresh, busyRef, optimisticMove }: {
               ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filter lanes and cards…  ( / )"
+              placeholder="Filter lanes and cards…"
               aria-label="Filter swimlanes"
             />
-            {query && (
+            {query ? (
               <button className="icon-btn sm" title="Clear" onClick={() => setQuery("")}>
                 <XIcon />
               </button>
+            ) : (
+              <kbd title="Press / to search">/</kbd>
             )}
           </div>
           {q && (
