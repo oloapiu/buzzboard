@@ -1,104 +1,94 @@
-// v2 scaffold: connection probe. Verifies from a real browser context that
-// the relay's CORS policy admits the NIP-98 Authorization header — the one
-// open question for the pure-static-SPA architecture. Becomes the settings
-// screen once the board lands.
-
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "./app.css";
+import { Board } from "./Board";
+import { fetchBoard, type BoardData } from "./lib/board";
 import { parsePrivateKey, Signer } from "./lib/nostr";
 import { Relay } from "./lib/relay";
-
-type ProbeResult =
-  | { state: "idle" }
-  | { state: "running" }
-  | { state: "ok"; repos: string[]; pubkey: string }
-  | { state: "error"; kind: "cors" | "http" | "input"; message: string };
 
 export default function App() {
   const [relayUrl, setRelayUrl] = useState(localStorage.getItem("buzzboard.relay") ?? "");
   const [key, setKey] = useState(localStorage.getItem("buzzboard.key") ?? "");
-  const [result, setResult] = useState<ProbeResult>({ state: "idle" });
+  const [editing, setEditing] = useState(!relayUrl || !key);
+  const [data, setData] = useState<BoardData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const busyRef = useRef(false); // true while dragging or a modal is open
 
-  async function runProbe() {
-    setResult({ state: "running" });
-    localStorage.setItem("buzzboard.relay", relayUrl);
-    localStorage.setItem("buzzboard.key", key);
-    let signer: Signer;
+  const session = useMemo(() => {
+    if (editing || !relayUrl || !key) return null;
     try {
-      signer = new Signer(parsePrivateKey(key));
+      const signer = new Signer(parsePrivateKey(key));
+      return { signer, relay: new Relay(relayUrl, signer) };
     } catch (err) {
-      setResult({ state: "error", kind: "input", message: String(err) });
-      return;
+      setError(String(err));
+      return null;
     }
-    const relay = new Relay(relayUrl, signer);
+  }, [relayUrl, key, editing]);
+
+  const refresh = useCallback(async () => {
+    if (!session) return;
     try {
-      const events = await relay.query([{ kinds: [30617], limit: 20 }]);
-      const repos = events
-        .map((ev) => ev.tags.find((t) => t[0] === "name")?.[1] ?? ev.tags.find((t) => t[0] === "d")?.[1])
-        .filter((n): n is string => Boolean(n));
-      setResult({ state: "ok", repos, pubkey: signer.pubkey });
+      setData(await fetchBoard(session.relay, session.signer.pubkey));
+      setError(null);
     } catch (err) {
-      // fetch() rejects with TypeError when CORS/preflight blocks the request;
-      // HTTP-level failures surface as our own Error with a status code.
-      const isCors = err instanceof TypeError;
-      setResult({
-        state: "error",
-        kind: isCors ? "cors" : "http",
-        message: isCors
-          ? `Request blocked before reaching the relay (likely CORS/preflight): ${err.message}. ` +
-            "Check the browser devtools console — if the preflight rejected the Authorization " +
-            "header, the wildcard-exclusion caveat applies."
-          : String(err),
-      });
+      setError(String(err));
     }
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+    refresh();
+    const timer = setInterval(() => {
+      if (!busyRef.current) refresh();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [session, refresh]);
+
+  function saveSettings(e: React.FormEvent) {
+    e.preventDefault();
+    localStorage.setItem("buzzboard.relay", relayUrl.trim());
+    localStorage.setItem("buzzboard.key", key.trim());
+    setEditing(false);
+  }
+
+  if (editing || !session) {
+    return (
+      <main className="settings">
+        <h1>buzzboard</h1>
+        <p className="muted">
+          A kanban over your buzz community. Your key stays in this browser.
+        </p>
+        <form onSubmit={saveSettings}>
+          <label>
+            Relay URL
+            <input value={relayUrl} onChange={(e) => setRelayUrl(e.target.value)}
+                   placeholder="wss://relay.example.com" required />
+          </label>
+          <label>
+            Private key (nsec or hex)
+            <input type="password" value={key} onChange={(e) => setKey(e.target.value)} required />
+          </label>
+          <button type="submit">Connect</button>
+        </form>
+        {error && <div className="error">{error}</div>}
+      </main>
+    );
   }
 
   return (
-    <main style={{ maxWidth: 560, margin: "4rem auto", fontFamily: "system-ui", lineHeight: 1.5 }}>
-      <h1>buzzboard v2 — relay probe</h1>
-      <p style={{ color: "#555" }}>
-        Signs a NIP-98 query in the browser and calls <code>POST /query</code> cross-origin.
-      </p>
-      <label style={{ display: "block", marginTop: 16 }}>
-        Relay URL
-        <input
-          value={relayUrl}
-          onChange={(e) => setRelayUrl(e.target.value)}
-          placeholder="wss://relay.example.com"
-          style={{ width: "100%", padding: 8, fontFamily: "monospace" }}
-        />
-      </label>
-      <label style={{ display: "block", marginTop: 12 }}>
-        Private key (nsec or hex)
-        <input
-          type="password"
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          style={{ width: "100%", padding: 8, fontFamily: "monospace" }}
-        />
-      </label>
-      <button
-        onClick={runProbe}
-        disabled={result.state === "running" || !relayUrl || !key}
-        style={{ marginTop: 16, padding: "8px 20px" }}
-      >
-        {result.state === "running" ? "Probing…" : "Run probe"}
-      </button>
-
-      {result.state === "ok" && (
-        <div style={{ marginTop: 20, padding: 12, background: "#e7f7e7", borderRadius: 6 }}>
-          <strong>✅ CORS + NIP-98 work from the browser.</strong>
-          <p>Signed as <code>{result.pubkey.slice(0, 16)}…</code></p>
-          <p>
-            {result.repos.length} repo(s): {result.repos.join(", ") || "(none yet)"}
-          </p>
+    <div>
+      <header className="topbar">
+        <div>
+          <strong>buzzboard</strong>
+          <span className="muted"> · {session.signer.pubkey.slice(0, 12)}…</span>
         </div>
+        <button className="ghost" onClick={() => setEditing(true)}>Settings</button>
+      </header>
+      {error && <div className="error">{error}</div>}
+      {data ? (
+        <Board data={data} session={session} refresh={refresh} busyRef={busyRef} />
+      ) : (
+        <p className="muted center">Loading board…</p>
       )}
-      {result.state === "error" && (
-        <div style={{ marginTop: 20, padding: 12, background: "#fdeaea", borderRadius: 6 }}>
-          <strong>{result.kind === "cors" ? "🚫 Blocked by browser" : "⚠ Failed"}</strong>
-          <p style={{ whiteSpace: "pre-wrap" }}>{result.message}</p>
-        </div>
-      )}
-    </main>
+    </div>
   );
 }

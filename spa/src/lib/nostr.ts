@@ -40,8 +40,10 @@ export function parsePrivateKey(value: string): Uint8Array {
 
 export class Signer {
   readonly pubkey: string;
+  private readonly secret: Uint8Array;
 
-  constructor(private readonly secret: Uint8Array) {
+  constructor(secret: Uint8Array) {
+    this.secret = secret;
     this.pubkey = getPublicKey(secret);
   }
 

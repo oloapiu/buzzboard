@@ -1,7 +1,7 @@
 // HTTP client for the buzz relay bridge (POST /query, POST /events),
 // mirroring buzz-cli: ws(s):// normalized to http(s)://, per-request NIP-98.
 
-import type { Signer, SignedEvent } from "./nostr";
+import type { Signer, SignedEvent } from "./nostr.ts";
 
 export function normalizeRelayUrl(url: string): string {
   let base = url.trim().replace(/\/+$/, "");
@@ -13,9 +13,11 @@ export function normalizeRelayUrl(url: string): string {
 
 export class Relay {
   private readonly base: string;
+  private readonly signer: Signer;
 
-  constructor(url: string, private readonly signer: Signer) {
+  constructor(url: string, signer: Signer) {
     this.base = normalizeRelayUrl(url);
+    this.signer = signer;
   }
 
   private async post(path: string, payload: unknown): Promise<Response> {
