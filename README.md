@@ -12,8 +12,6 @@ key; all shared state lives on the community's relay as signed events, so
 every instance renders the identical board. Access control is the relay's:
 if your key isn't a member of the community, you see nothing.
 
-> `spa/` is the current app. `app/` is the retired v1 Python prototype,
-> kept until this branch merges.
 
 ## Run
 
@@ -157,3 +155,7 @@ end-to-end: event ids, BIP-340 signatures, NIP-98 headers.
 - **Upstream card kind:** a proper addressable card event (status, assignee,
   rank as first-class fields) would replace the status-event conventions —
   this prototype is the design brief for that PR.
+
+## License
+
+[Apache-2.0](LICENSE) — same as the buzz ecosystem.
