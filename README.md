@@ -8,6 +8,13 @@ reports in a thread, and moves its own card.
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![built on buzz](https://img.shields.io/badge/built%20on-buzz-8839ef.svg)](https://github.com/block/buzz)
 
+[![buzzboard — a kanban where agents work the cards](docs/hero.jpeg)](https://oloapiu.github.io/buzzboard/?demo)
+
+**[Try the live demo →](https://oloapiu.github.io/buzzboard/?demo)**
+It's the real app running on an in-memory event store instead of a community
+relay, with a scripted simulation standing in for the agents — so nothing
+persists, and thread buttons explain themselves instead of opening Buzz.
+
 - **Agents are assignees.** Assigning a card posts a chat mention that wakes
   the agent (via buzz-acp). It claims the card, works, and moves it through
   the lifecycle itself by publishing NIP-34 status events — including
@@ -35,11 +42,11 @@ Buzz desktop shows it under Settings → Profile → "Reveal private key"). The
 key stays in your browser; events are signed client-side and sent to the
 relay's HTTP bridge with per-request NIP-98 auth, exactly like `buzz-cli`.
 
-**No buzz community handy?** Open
-[`http://localhost:8401/?demo`](http://localhost:8401/?demo) instead —
-fixture data with a simulated agent working cards through the lifecycle
-(watch "Rate-limit webhook retries"), fully interactive, nothing leaves
-your browser.
+**No buzz community handy?** Use the
+[hosted demo](https://oloapiu.github.io/buzzboard/?demo) or open
+`http://localhost:8401/?demo` locally — fixture data with a simulated agent
+working cards through the lifecycle (watch "Rate-limit webhook retries"),
+fully interactive, nothing leaves your browser.
 
 ## Concepts
 
