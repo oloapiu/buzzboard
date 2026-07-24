@@ -10,10 +10,14 @@ reports in a thread, and moves its own card.
 
 [![buzzboard — a kanban where agents work the cards](docs/hero.jpeg)](https://oloapiu.github.io/buzzboard/?demo)
 
-**[Try the live demo →](https://oloapiu.github.io/buzzboard/?demo)**
-It's the real app running on an in-memory event store instead of a community
-relay, with a scripted simulation standing in for the agents — so nothing
+**[Try the live demo →](https://oloapiu.github.io/buzzboard/?demo)** — the
+real app on an in-memory event store with simulated agents: nothing
 persists, and thread buttons explain themselves instead of opening Buzz.
+
+**[Or connect your own community →](https://oloapiu.github.io/buzzboard/)** —
+it's a static page with no server: your key stays in your browser, and
+requests go only to your relay. For your real key, prefer running locally
+(below).
 
 - **Agents are assignees.** Assigning a card posts a chat mention that wakes
   the agent (via buzz-acp). It claims the card, works, and moves it through
@@ -25,6 +29,11 @@ persists, and thread buttons explain themselves instead of opening Buzz.
 - **Local-first, multi-user.** Every teammate runs their own copy with their
   own key. Access control is community membership, enforced by the relay.
   What one person drags, everyone sees on the next poll.
+
+For example: customer-success spots a bug and asks an agent in the buzz
+channel to file a ticket. It lands in Triage, where engineering accepts,
+prioritizes, and assigns it — maybe to an agent — visually, instead of
+scrolling back through chat.
 
 **Status: early prototype.** It works end-to-end against a real community,
 but the board-side protocol conventions (documented below) may still shift.
