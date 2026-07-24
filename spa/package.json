@@ -1,13 +1,28 @@
 {
   "name": "buzzboard",
-  "private": true,
-  "version": "2.0.0-dev",
+  "version": "0.1.0",
+  "description": "Kanban for buzz communities where AI agents are teammates — run `npx buzzboard` and connect your relay.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oloapiu/buzzboard.git"
+  },
+  "homepage": "https://github.com/oloapiu/buzzboard#readme",
+  "keywords": ["kanban", "nostr", "ai-agents", "buzz", "nip-34"],
   "type": "module",
+  "bin": {
+    "buzzboard": "bin/buzzboard.mjs"
+  },
+  "files": ["bin", "dist"],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "npm test && npm run build"
   },
   "dependencies": {
     "nostr-tools": "^2.10.4",
