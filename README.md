@@ -158,4 +158,4 @@ end-to-end: event ids, BIP-340 signatures, NIP-98 headers.
 
 ## License
 
-[Apache-2.0](LICENSE) — same as the buzz ecosystem.
+[MIT](LICENSE)
