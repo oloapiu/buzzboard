@@ -4,6 +4,7 @@ import { Board } from "./Board";
 import { cardOrder, fetchBoard, type BoardData } from "./lib/board";
 import type { Column } from "./lib/kinds";
 import { GearIcon, LogoIcon, UsersIcon } from "./Icons";
+import { demoSigner, getDemoRelay } from "./lib/demo";
 import { parsePrivateKey, Signer } from "./lib/nostr";
 import { Relay } from "./lib/relay";
 
@@ -15,7 +16,15 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const busyRef = useRef(false); // true while dragging or a modal is open
 
+  const demo = useMemo(
+    () => new URLSearchParams(window.location.search).has("demo"),
+    [],
+  );
+
   const session = useMemo(() => {
+    if (demo) {
+      return { signer: demoSigner, relay: getDemoRelay() as unknown as Relay, demo: true };
+    }
     if (editing || !relayUrl || !key) return null;
     try {
       const signer = new Signer(parsePrivateKey(key));
@@ -24,7 +33,7 @@ export default function App() {
       setError(String(err));
       return null;
     }
-  }, [relayUrl, key, editing]);
+  }, [relayUrl, key, editing, demo]);
 
   const refresh = useCallback(async () => {
     if (!session) return;
@@ -70,7 +79,7 @@ export default function App() {
     setEditing(false);
   }
 
-  if (editing || !session) {
+  if (!session) {
     return (
       <main className="settings">
         <div className="settings-brand"><LogoIcon /></div>
@@ -91,6 +100,10 @@ export default function App() {
           <button type="submit">Connect</button>
         </form>
         {error && <div className="error">{error}</div>}
+        <p className="muted demo-invite">
+          No community yet? <a href="?demo">Explore the demo</a> — fake data,
+          simulated agents, nothing leaves your browser.
+        </p>
       </main>
     );
   }
@@ -112,15 +125,24 @@ export default function App() {
           <span className="logo"><LogoIcon /></span>
           <span className="wordmark"><em>buzz</em>board</span>
           <span className="brand-sep" aria-hidden />
-          <span className="community" title={relayUrl}>
-            <UsersIcon />{communityHost}
+          <span className="community" title={session.demo ? "in-memory demo" : relayUrl}>
+            <UsersIcon />{session.demo ? "demo community" : communityHost}
           </span>
+          {session.demo && (
+            <span className="pill demo-pill" title="Fake data + simulated agents. Nothing leaves your browser; reload to reset.">
+              demo
+            </span>
+          )}
         </div>
         <div className="topbar-right">
           <span className="user-chip" title={session.signer.pubkey}>{myName}</span>
-          <button className="icon-btn" onClick={() => setEditing(true)} title="Settings">
-            <GearIcon />
-          </button>
+          {session.demo ? (
+            <a className="ghost-link" href={window.location.pathname}>Exit demo</a>
+          ) : (
+            <button className="icon-btn" onClick={() => setEditing(true)} title="Settings">
+              <GearIcon />
+            </button>
+          )}
         </div>
       </header>
       {error && <div className="error">{error}</div>}

@@ -340,3 +340,30 @@ legend {
   padding: 0 0.35rem; white-space: nowrap;
 }
 .actions { display: flex; justify-content: flex-end; gap: 0.6rem; }
+
+/* --- demo mode --- */
+.demo-pill { background: var(--yellow); color: var(--background); cursor: help; }
+.demo-invite { margin-top: 1.2rem; text-align: center; }
+.ghost-link {
+  font-size: 0.82rem; color: var(--muted-foreground); text-decoration: none;
+  border: 1px solid var(--border); border-radius: calc(var(--radius) - 3px);
+  padding: 0.32rem 0.75rem;
+}
+.ghost-link:hover { color: var(--primary); border-color: var(--border-strong); }
+.thread { display: grid; gap: 0.55rem; }
+.msg {
+  background: var(--well); border-radius: calc(var(--radius) - 3px);
+  padding: 0.6rem 0.75rem; font-size: 0.86rem; max-width: 92%;
+}
+.msg.me { background: var(--primary-soft); justify-self: end; }
+.msg .who {
+  display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.2rem;
+  font-size: 0.72rem; font-weight: 600; color: var(--muted-foreground);
+}
+.msg .who svg { color: var(--primary); }
+.explain {
+  border-left: 3px solid var(--primary); background: var(--primary-soft);
+  border-radius: 0 calc(var(--radius) - 3px) calc(var(--radius) - 3px) 0;
+  padding: 0.7rem 0.85rem; font-size: 0.84rem; color: var(--foreground);
+}
+.explain code { font-size: 0.78rem; }

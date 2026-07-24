@@ -69,10 +69,11 @@ export function NewCardModal({ lane, session, syncAgentName, close, refresh }: {
   );
 }
 
-export function CardModal({ card, lane, session, agents, nameOf, close, refresh }: {
+export function CardModal({ card, lane, session, agents, nameOf, onDemoThread, close, refresh }: {
   card: Card; lane: Lane; session: Session;
   agents: (Agent & { inChannel: boolean })[];
   nameOf: (pk: string | null | undefined) => string;
+  onDemoThread?: (card: Card) => void;
   close: () => void; refresh: () => Promise<void>;
 }) {
   const [column, setColumn] = useState<Column>(card.column);
@@ -93,13 +94,19 @@ export function CardModal({ card, lane, session, agents, nameOf, close, refresh 
         <div className="notice">
           <strong>⚠ The agent is blocked</strong> and needs your input.{" "}
           {card.threadLink && (<>Read its report and reply in{" "}
-            <a href={card.threadLink}>the Buzz thread</a> — </>)}
+            {onDemoThread
+              ? <a href="#thread" onClick={(e) => { e.preventDefault(); onDemoThread(card); }}>the Buzz thread</a>
+              : <a href={card.threadLink}>the Buzz thread</a>}{" — "}</>)}
           or spin the ask into a new ticket, or move this card back to Backlog.
         </div>
       )}
       {card.body && <pre className="body">{card.body}</pre>}
       {card.threadLink && !card.blocked && (
-        <p><a href={card.threadLink}>💬 Open the agent thread in Buzz</a></p>
+        <p>
+          {onDemoThread
+            ? <a href="#thread" onClick={(e) => { e.preventDefault(); onDemoThread(card); }}>💬 Open the agent thread</a>
+            : <a href={card.threadLink}>💬 Open the agent thread in Buzz</a>}
+        </p>
       )}
       {card.githubIssueUrl && (
         <p className="inline-link"><GithubIcon />
@@ -232,6 +239,42 @@ export function NewLaneModal({ session, agents, close, refresh }: {
           <button type="submit" disabled={busy}>{busy ? "Creating…" : "Create lane"}</button>
         </div>
       </form>
+    </Overlay>
+  );
+}
+
+export function DemoThreadModal({ card, nameOf, close }: {
+  card: Card; nameOf: (pk: string | null | undefined) => string; close: () => void;
+}) {
+  const agent = nameOf(card.assignee) || "the agent";
+  return (
+    <Overlay close={close}>
+      <div className="modal-head">
+        <h2>Agent thread <span className="muted">(demo)</span></h2>
+        <button className="icon-btn" onClick={close} title="Close"><XIcon /></button>
+      </div>
+      <div className="thread">
+        <div className="msg me">
+          <span className="who">Ada</span>
+          @{agent} you've been assigned: <strong>{card.subject}</strong> — read it, report
+          progress in this thread, move the card as you go.
+        </div>
+        <div className="msg">
+          <span className="who"><BotIcon />{agent}</span>
+          {card.blocked
+            ? <>I'm blocked: I need a decision from you before I can continue — see the card.
+                I've set the status to draft so the board flags it.</>
+            : <>Claimed. I'll set the card to In Progress while I work and to In Review when
+                it's ready for your sign-off.</>}
+        </div>
+      </div>
+      <div className="explain">
+        In the real app this button deep-links into the <strong>Buzz desktop app</strong> at
+        this exact thread (<code>buzz://message?…</code>). There you'd read the agent's full
+        report and reply to {card.blocked ? "unblock it — it resumes and moves the card itself"
+        : "steer it — every status change you see here is the agent publishing signed events"}.
+        In demo mode the "agent" is a local simulation, so there's no thread to open.
+      </div>
     </Overlay>
   );
 }

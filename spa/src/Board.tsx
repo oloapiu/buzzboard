@@ -11,11 +11,14 @@ import {
 } from "./Icons";
 import type { Signer } from "./lib/nostr";
 import type { Relay } from "./lib/relay";
-import { CardModal, NewCardModal, NewLaneModal, AttachChannelModal } from "./Modals";
+import {
+  CardModal, DemoThreadModal, NewCardModal, NewLaneModal, AttachChannelModal,
+} from "./Modals";
 
 export interface Session {
   relay: Relay;
   signer: Signer;
+  demo?: boolean;
 }
 
 type Modal =
@@ -23,7 +26,8 @@ type Modal =
   | { kind: "card"; card: Card; lane: Lane }
   | { kind: "new-card"; lane: Lane }
   | { kind: "new-lane" }
-  | { kind: "attach-channel"; lane: Lane };
+  | { kind: "attach-channel"; lane: Lane }
+  | { kind: "demo-thread"; card: Card };
 
 export function Board({ data, session, refresh, busyRef, optimisticMove }: {
   data: BoardData;
@@ -221,12 +225,20 @@ export function Board({ data, session, refresh, busyRef, optimisticMove }: {
                             <span className="badge blocked"><AlertIcon />Blocked</span>
                           )}
                           {card.labels.map((l) => <span key={l} className="badge">{l}</span>)}
-                          {card.threadLink && (
+                          {card.threadLink && (session.demo ? (
+                            <button className="icon-btn sm" title="Agent thread (demo)"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setModal({ kind: "demo-thread", card });
+                                    }}>
+                              <MessageIcon />
+                            </button>
+                          ) : (
                             <a href={card.threadLink} className="icon-btn sm"
                                onClick={(e) => e.stopPropagation()} title="Open thread in Buzz">
                               <MessageIcon />
                             </a>
-                          )}
+                          ))}
                           {card.githubIssueUrl && (
                             <a href={card.githubIssueUrl} className="icon-btn sm" target="_blank"
                                rel="noreferrer" onClick={(e) => e.stopPropagation()}
@@ -254,7 +266,14 @@ export function Board({ data, session, refresh, busyRef, optimisticMove }: {
       {modal.kind === "card" && (
         <CardModal card={modal.card} lane={modal.lane} session={session}
                    agents={agentsForLane(data.agents, modal.lane)} nameOf={nameOf}
+                   onDemoThread={session.demo
+                     ? (card) => setModal({ kind: "demo-thread", card })
+                     : undefined}
                    close={() => setModal({ kind: "none" })} refresh={refresh} />
+      )}
+      {modal.kind === "demo-thread" && (
+        <DemoThreadModal card={modal.card} nameOf={nameOf}
+                         close={() => setModal({ kind: "none" })} />
       )}
       {modal.kind === "new-card" && (
         <NewCardModal lane={modal.lane} session={session}

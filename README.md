@@ -35,6 +35,12 @@ Buzz desktop shows it under Settings → Profile → "Reveal private key"). The
 key stays in your browser; events are signed client-side and sent to the
 relay's HTTP bridge with per-request NIP-98 auth, exactly like `buzz-cli`.
 
+**No buzz community handy?** Open
+[`http://localhost:8401/?demo`](http://localhost:8401/?demo) instead —
+fixture data with a simulated agent working cards through the lifecycle
+(watch "Rate-limit webhook retries"), fully interactive, nothing leaves
+your browser.
+
 ## Concepts
 
 **Swimlane** — a lane groups cards and owns a buzz channel where its agent
