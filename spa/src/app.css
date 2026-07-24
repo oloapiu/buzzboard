@@ -55,13 +55,30 @@
 }
 
 * { box-sizing: border-box; margin: 0; }
-html { color-scheme: light dark; }
+html { color-scheme: light dark; background: var(--background); }
 body {
   font-family: "Inter Variable", Inter, "Avenir Next", "Segoe UI", sans-serif;
-  background: var(--background);
+  background: transparent;
   color: var(--foreground);
   line-height: 1.45;
   font-size: 0.9375rem;
+}
+/* brand watermark: the logo masked in foreground ink at whisper opacity,
+   fixed behind everything (html carries the page background so z-index -1
+   still paints above it) */
+body::before {
+  content: "";
+  position: fixed;
+  right: -3.5rem;
+  bottom: -2.5rem;
+  width: 30rem;
+  height: 19.64rem; /* 840:550 */
+  background: var(--foreground);
+  opacity: 0.03;
+  -webkit-mask: url("/icon.svg") no-repeat center / contain;
+  mask: url("/icon.svg") no-repeat center / contain;
+  pointer-events: none;
+  z-index: -1;
 }
 ::selection { background: var(--primary-soft); }
 
