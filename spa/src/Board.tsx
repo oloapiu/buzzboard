@@ -4,6 +4,7 @@ import {
   addBoardLinkToCanvas, laneBoardUrl, moveCard,
   type Agent, type BoardData, type Card, type Lane,
 } from "./lib/board";
+import { rankBetween } from "./lib/rank";
 import type { Signer } from "./lib/nostr";
 import type { Relay } from "./lib/relay";
 import { CardModal, NewCardModal, NewLaneModal, AttachChannelModal } from "./Modals";
@@ -20,13 +21,15 @@ type Modal =
   | { kind: "new-lane" }
   | { kind: "attach-channel"; lane: Lane };
 
-export function Board({ data, session, refresh, busyRef }: {
+export function Board({ data, session, refresh, busyRef, optimisticMove }: {
   data: BoardData;
   session: Session;
   refresh: () => Promise<void>;
   busyRef: MutableRefObject<boolean>;
+  optimisticMove: (lane: string, cardId: string, column: Column, rank: string) => void;
 }) {
   const [modal, setModalState] = useState<Modal>({ kind: "none" });
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
   const dragging = useRef<{ cardId: string; lane: string } | null>(null);
 
   const setModal = (m: Modal) => {
@@ -39,15 +42,15 @@ export function Board({ data, session, refresh, busyRef }: {
     return data.names.get(pk.toLowerCase()) ?? pk.slice(0, 8);
   };
 
-  async function onDrop(lane: Lane, column: Column, e: React.DragEvent) {
+  function onDrop(lane: Lane, column: Column, e: React.DragEvent) {
     e.preventDefault();
-    busyRef.current = false;
+    setDropTarget(null);
     const drag = dragging.current;
     dragging.current = null;
-    if (!drag || drag.lane !== lane.address) return;
+    if (!drag || drag.lane !== lane.address) { busyRef.current = false; return; }
     const all = data.cards.get(lane.address) ?? [];
     const card = all.find((c) => c.id === drag.cardId);
-    if (!card) return;
+    if (!card) { busyRef.current = false; return; }
 
     // insertion index from pointer position among the target cell's cards
     const cell = e.currentTarget as HTMLElement;
@@ -62,12 +65,15 @@ export function Board({ data, session, refresh, busyRef }: {
     // nearest *ranked* neighbors — unranked cards can't anchor a rank
     const before = target.slice(0, index).reverse().find((c) => c.rank !== null) ?? null;
     const after = target.slice(index).find((c) => c.rank !== null) ?? null;
-    try {
-      await moveCard(session.relay, session.signer, lane, card, column, { before, after });
-      await refresh();
-    } catch (err) {
-      alert(String(err));
-    }
+
+    // move locally right now; publish + reconcile in the background
+    const rank = rankBetween(before?.rank ?? "", after?.rank ?? "");
+    optimisticMove(lane.address, card.id, column, rank);
+    busyRef.current = true; // hold off polling until the relay has the event
+    moveCard(session.relay, session.signer, lane, card, column, { before, after })
+      .then(() => refresh())
+      .catch((err) => { alert(String(err)); return refresh(); })
+      .finally(() => { busyRef.current = modal.kind !== "none"; });
   }
 
   return (
@@ -96,16 +102,25 @@ export function Board({ data, session, refresh, busyRef }: {
           <div className="columns">
             {COLUMNS.map((col) => {
               const cell = (data.cards.get(lane.address) ?? []).filter((c) => c.column === col);
+              const cellKey = `${lane.address}:${col}`;
               return (
                 <div key={col} className="column">
                   <div className="column-head">
-                    <span>{COLUMN_LABELS[col]}</span>
-                    <span className="muted">{cell.length}</span>
+                    <span><i className={`dot dot-${col}`} />{COLUMN_LABELS[col]}</span>
+                    <span className="count">{cell.length}</span>
                   </div>
                   <div
-                    className="cell"
+                    className={`cell${dropTarget === cellKey ? " drop-over" : ""}`}
                     onDragOver={(e) => {
-                      if (dragging.current?.lane === lane.address) e.preventDefault();
+                      if (dragging.current?.lane === lane.address) {
+                        e.preventDefault();
+                        if (dropTarget !== cellKey) setDropTarget(cellKey);
+                      }
+                    }}
+                    onDragLeave={(e) => {
+                      if (e.currentTarget === e.target && dropTarget === cellKey) {
+                        setDropTarget(null);
+                      }
                     }}
                     onDrop={(e) => onDrop(lane, col, e)}
                   >
@@ -122,6 +137,7 @@ export function Board({ data, session, refresh, busyRef }: {
                         onDragEnd={() => {
                           busyRef.current = modal.kind !== "none";
                           dragging.current = null;
+                          setDropTarget(null);
                         }}
                         onClick={() => setModal({ kind: "card", card, lane })}
                       >

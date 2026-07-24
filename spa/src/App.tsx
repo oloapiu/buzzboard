@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./app.css";
 import { Board } from "./Board";
-import { fetchBoard, type BoardData } from "./lib/board";
+import { cardOrder, fetchBoard, type BoardData } from "./lib/board";
+import type { Column } from "./lib/kinds";
 import { parsePrivateKey, Signer } from "./lib/nostr";
 import { Relay } from "./lib/relay";
 
@@ -33,6 +34,24 @@ export default function App() {
       setError(String(err));
     }
   }, [session]);
+
+  // instant local echo of a drag — the relay publish + refetch reconcile later
+  const optimisticMove = useCallback(
+    (laneAddress: string, cardId: string, column: Column, rank: string) => {
+      setData((d) => {
+        if (!d) return d;
+        const cards = new Map(d.cards);
+        const list = [...(cards.get(laneAddress) ?? [])];
+        const i = list.findIndex((c) => c.id === cardId);
+        if (i < 0) return d;
+        list[i] = { ...list[i], column, rank, blocked: false };
+        list.sort(cardOrder);
+        cards.set(laneAddress, list);
+        return { ...d, cards };
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!session) return;
@@ -85,7 +104,8 @@ export default function App() {
       </header>
       {error && <div className="error">{error}</div>}
       {data ? (
-        <Board data={data} session={session} refresh={refresh} busyRef={busyRef} />
+        <Board data={data} session={session} refresh={refresh} busyRef={busyRef}
+               optimisticMove={optimisticMove} />
       ) : (
         <p className="muted center">Loading board…</p>
       )}

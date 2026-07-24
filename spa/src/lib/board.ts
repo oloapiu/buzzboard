@@ -181,7 +181,7 @@ function deriveCard(
   };
 }
 
-const cardOrder = (a: Card, b: Card) => {
+export const cardOrder = (a: Card, b: Card) => {
   if (a.rank !== null && b.rank !== null) return a.rank < b.rank ? -1 : 1;
   if (a.rank !== null) return -1;
   if (b.rank !== null) return 1;
