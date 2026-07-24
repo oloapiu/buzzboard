@@ -71,9 +71,6 @@ export const tagValue = (ev: SignedEvent, name: string): string | undefined =>
 const tagValues = (ev: SignedEvent, name: string): string[] =>
   ev.tags.filter((t) => t[0] === name && t.length >= 2).map((t) => t[1]);
 
-const newestFirst = (a: SignedEvent, b: SignedEvent) =>
-  b.created_at - a.created_at || (a.id < b.id ? -1 : 1);
-
 const latestPerCoord = (events: SignedEvent[]): SignedEvent[] => {
   const best = new Map<string, SignedEvent>();
   for (const ev of events) {
@@ -101,13 +98,22 @@ const columnFromLabels = (labels: string[]): Column | null => {
   return null;
 };
 
+// Status recency: created_at desc, but NIP-01 timestamps have one-second
+// resolution and agents emit bursts ("claim, then immediately block/resolve"
+// runs both CLI commands within a second). On a tie, `open` loses to any
+// more final status — the non-open event is the intent of the burst.
+const statusRecency = (a: SignedEvent, b: SignedEvent) =>
+  b.created_at - a.created_at ||
+  Number(a.kind === K.KIND_STATUS_OPEN) - Number(b.kind === K.KIND_STATUS_OPEN) ||
+  (a.id < b.id ? -1 : 1);
+
 function deriveCard(
   issue: SignedEvent, statuses: SignedEvent[], names: Set<string>,
   syncAgent: string | null,
 ): Card {
   const referencing = statuses
     .filter((ev) => ev.tags.some((t) => t[0] === "e" && t[1] === issue.id))
-    .sort(newestFirst);
+    .sort(statusRecency);
 
   // loosely-derived fields: newest event carrying the tag, any member
   const assignee =

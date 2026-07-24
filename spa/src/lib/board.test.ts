@@ -209,6 +209,26 @@ describe("assignee lifecycle", () => {
     expect(r.cards[0].blocked).toBe(false);
   });
 
+  it("same-second burst: open loses the tie to a more final status", async () => {
+    // agents run 'claim' + 'block' (or + 'resolve') within one second; NIP-01
+    // timestamps can't order them, so kind precedence must
+    const r1 = await boardWith([
+      laneEvent(), issue, assign,
+      statusEvent(1630, AGENT, 200, issue.id, { noA: true }),
+      statusEvent(1633, AGENT, 200, issue.id, { noA: true }),
+    ]);
+    expect(r1.cards[0].column).toBe("in_review");
+    expect(r1.cards[0].blocked).toBe(true);
+
+    const r2 = await boardWith([
+      laneEvent(), issue, assign,
+      statusEvent(1631, AGENT, 200, issue.id, { noA: true }),
+      statusEvent(1630, AGENT, 200, issue.id, { noA: true }),
+    ]);
+    expect(r2.cards[0].column).toBe("in_review");
+    expect(r2.cards[0].blocked).toBe(false);
+  });
+
   it("statuses reachable only via #e (no repo tag) still count", async () => {
     const { cards } = await boardWith([
       laneEvent(), issue, assign,
