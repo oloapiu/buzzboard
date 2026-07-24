@@ -6,6 +6,7 @@ import {
   type Agent, type Card, type Lane,
 } from "./lib/board";
 import type { Session } from "./Board";
+import { BotIcon, GithubIcon, XIcon } from "./Icons";
 
 function Overlay({ children, close }: { children: React.ReactNode; close: () => void }) {
   return (
@@ -84,7 +85,7 @@ export function CardModal({ card, lane, session, agents, nameOf, close, refresh 
     <Overlay close={close}>
       <div className="modal-head">
         <h2>{card.subject}</h2>
-        <button className="ghost" onClick={close}>✕</button>
+        <button className="icon-btn" onClick={close} title="Close"><XIcon /></button>
       </div>
       <p className="muted mono">{card.id.slice(0, 16)}… · {lane.name} · by {nameOf(card.author)}</p>
 
@@ -101,9 +102,9 @@ export function CardModal({ card, lane, session, agents, nameOf, close, refresh 
         <p><a href={card.threadLink}>💬 Open the agent thread in Buzz</a></p>
       )}
       {card.githubIssueUrl && (
-        <p><a href={card.githubIssueUrl} target="_blank" rel="noreferrer">
-          GH↗ Mirrored GitHub issue
-        </a></p>
+        <p className="inline-link"><GithubIcon />
+          <a href={card.githubIssueUrl} target="_blank" rel="noreferrer">Mirrored GitHub issue</a>
+        </p>
       )}
 
       <div className="row">
@@ -127,7 +128,7 @@ export function CardModal({ card, lane, session, agents, nameOf, close, refresh 
             <option value="">— unassigned —</option>
             {agents.map((a) => (
               <option key={a.pubkey} value={a.pubkey}>
-                🤖 {a.name} ({a.pubkey.slice(0, 8)}){a.inChannel ? "" : " — ⚠ not in lane channel"}
+                {a.name} · {a.pubkey.slice(0, 8)}{a.inChannel ? "" : "  ⚠ not in lane channel"}
               </option>
             ))}
           </select>
@@ -197,7 +198,7 @@ export function NewLaneModal({ session, agents, close, refresh }: {
                 <select value={syncAgent} onChange={(e) => setSyncAgent(e.target.value)}>
                   <option value="">— pick the sync agent —</option>
                   {agents.map((a) => (
-                    <option key={a.pubkey} value={a.pubkey}>🤖 {a.name}</option>
+                    <option key={a.pubkey} value={a.pubkey}>{a.name} · {a.pubkey.slice(0, 8)}</option>
                   ))}
                 </select>
                 <p className="muted">
@@ -220,7 +221,7 @@ export function NewLaneModal({ session, agents, close, refresh }: {
                          if (e.target.checked) next.add(a.pubkey); else next.delete(a.pubkey);
                          setStaff(next);
                        }} />
-                🤖 {a.name}
+                <span className="agent-name"><BotIcon />{a.name}</span>
               </label>
             ))}
           </fieldset>

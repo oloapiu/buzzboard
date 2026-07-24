@@ -3,6 +3,7 @@ import "./app.css";
 import { Board } from "./Board";
 import { cardOrder, fetchBoard, type BoardData } from "./lib/board";
 import type { Column } from "./lib/kinds";
+import { GearIcon, UsersIcon } from "./Icons";
 import { parsePrivateKey, Signer } from "./lib/nostr";
 import { Relay } from "./lib/relay";
 
@@ -93,14 +94,32 @@ export default function App() {
     );
   }
 
+  const communityHost = (() => {
+    try {
+      return new URL(relayUrl.replace(/^ws(s?):\/\//, "http$1://")).hostname;
+    } catch {
+      return relayUrl;
+    }
+  })();
+  const myName =
+    data?.names.get(session.signer.pubkey) ?? `${session.signer.pubkey.slice(0, 8)}…`;
+
   return (
     <div>
       <header className="topbar">
-        <div>
-          <strong>buzzboard</strong>
-          <span className="muted"> · {session.signer.pubkey.slice(0, 12)}…</span>
+        <div className="brand">
+          <span className="wordmark"><em>buzz</em>board</span>
+          <span className="brand-sep" aria-hidden />
+          <span className="community" title={relayUrl}>
+            <UsersIcon />{communityHost}
+          </span>
         </div>
-        <button className="ghost" onClick={() => setEditing(true)}>Settings</button>
+        <div className="topbar-right">
+          <span className="user-chip" title={session.signer.pubkey}>{myName}</span>
+          <button className="icon-btn" onClick={() => setEditing(true)} title="Settings">
+            <GearIcon />
+          </button>
+        </div>
       </header>
       {error && <div className="error">{error}</div>}
       {data ? (

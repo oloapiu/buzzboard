@@ -5,6 +5,9 @@ import {
   type Agent, type BoardData, type Card, type Lane,
 } from "./lib/board";
 import { rankBetween } from "./lib/rank";
+import {
+  AlertIcon, BotIcon, CheckIcon, ClipboardIcon, GithubIcon, MessageIcon, PlusIcon,
+} from "./Icons";
 import type { Signer } from "./lib/nostr";
 import type { Relay } from "./lib/relay";
 import { CardModal, NewCardModal, NewLaneModal, AttachChannelModal } from "./Modals";
@@ -84,20 +87,28 @@ export function Board({ data, session, refresh, busyRef, optimisticMove }: {
       {data.lanes.map((lane) => (
         <section key={lane.address} className="lane" id={`lane-${lane.repoId}`}>
           <div className="lane-head">
-            <div>
-              <strong>{lane.name}</strong>
-              {lane.githubUrl && (
-                <a className="chip" href={lane.githubUrl} target="_blank" rel="noreferrer">GitHub ↗</a>
-              )}
-              {!lane.channelId && lane.owner === session.signer.pubkey && (
-                <button className="chip warn" onClick={() => setModal({ kind: "attach-channel", lane })}>
-                  no channel — attach
-                </button>
-              )}
-              {lane.channelId && <CanvasLinkChip lane={lane} session={session} />}
-              {lane.description && <span className="muted"> — {lane.description}</span>}
+            <div className="lane-info">
+              <div className="lane-title-row">
+                <h2 className="lane-name">{lane.name}</h2>
+                <div className="lane-actions">
+                  {lane.githubUrl && (
+                    <a className="icon-btn sm" href={lane.githubUrl} target="_blank"
+                       rel="noreferrer" title="GitHub repository"><GithubIcon /></a>
+                  )}
+                  {lane.channelId && <CanvasLinkChip lane={lane} session={session} />}
+                  {!lane.channelId && lane.owner === session.signer.pubkey && (
+                    <button className="pill warn"
+                            onClick={() => setModal({ kind: "attach-channel", lane })}>
+                      <AlertIcon />attach channel
+                    </button>
+                  )}
+                </div>
+              </div>
+              {lane.description && <p className="lane-desc">{lane.description}</p>}
             </div>
-            <button className="ghost" onClick={() => setModal({ kind: "new-card", lane })}>+ card</button>
+            <button className="ghost sm" onClick={() => setModal({ kind: "new-card", lane })}>
+              <PlusIcon />Card
+            </button>
           </div>
           <div className="columns">
             {COLUMNS.map((col) => {
@@ -143,20 +154,24 @@ export function Board({ data, session, refresh, busyRef, optimisticMove }: {
                       >
                         <div className="card-title">{card.subject}</div>
                         <div className="card-meta">
-                          {card.blocked && <span className="badge blocked">⚠ blocked</span>}
+                          {card.blocked && (
+                            <span className="badge blocked"><AlertIcon />Blocked</span>
+                          )}
                           {card.labels.map((l) => <span key={l} className="badge">{l}</span>)}
                           {card.threadLink && (
-                            <a href={card.threadLink} className="badge link"
-                               onClick={(e) => e.stopPropagation()} title="Open thread in Buzz">💬</a>
+                            <a href={card.threadLink} className="icon-btn sm"
+                               onClick={(e) => e.stopPropagation()} title="Open thread in Buzz">
+                              <MessageIcon />
+                            </a>
                           )}
                           {card.githubIssueUrl && (
-                            <a href={card.githubIssueUrl} className="badge link" target="_blank"
+                            <a href={card.githubIssueUrl} className="icon-btn sm" target="_blank"
                                rel="noreferrer" onClick={(e) => e.stopPropagation()}
-                               title="Mirrored GitHub issue">GH↗</a>
+                               title="Mirrored GitHub issue"><GithubIcon /></a>
                           )}
                           {card.assignee && (
                             <span className="badge assignee" title={card.assignee}>
-                              {nameOf(card.assignee)}
+                              <BotIcon />{nameOf(card.assignee)}
                             </span>
                           )}
                         </div>
@@ -199,7 +214,7 @@ function CanvasLinkChip({ lane, session }: { lane: Lane; session: Session }) {
   const [state, setState] = useState<"idle" | "busy" | "done">("idle");
   return (
     <button
-      className="chip"
+      className={`icon-btn sm${state === "done" ? " ok" : ""}`}
       disabled={state !== "idle"}
       title="Write an 'Open buzzboard' link into the lane channel's canvas"
       onClick={async () => {
@@ -215,7 +230,7 @@ function CanvasLinkChip({ lane, session }: { lane: Lane; session: Session }) {
         }
       }}
     >
-      {state === "done" ? "✓ canvas updated" : state === "busy" ? "…" : "📋 canvas link"}
+      {state === "done" ? <CheckIcon /> : <ClipboardIcon />}
     </button>
   );
 }
