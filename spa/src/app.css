@@ -286,9 +286,15 @@ button.sm svg { font-size: 0.8rem; }
 .row label { flex: 1; display: grid; gap: 0.3rem; font-size: 0.78rem; color: var(--muted-foreground); font-weight: 500; }
 .check { display: flex; gap: 0.5rem; align-items: center; font-size: 0.85rem; color: var(--muted-foreground); }
 .check input { width: auto; accent-color: var(--primary); }
+/* keep fieldset in normal flow — display:grid collapses the legend to
+   min-content width and it wraps word-by-word */
 fieldset {
   border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px);
-  padding: 0.65rem 0.85rem; display: grid; gap: 0.5rem;
+  padding: 0.55rem 0.85rem 0.75rem; min-width: 0;
 }
-legend { font-size: 0.78rem; color: var(--muted-foreground); font-weight: 500; padding: 0 0.3rem; }
+fieldset > * + * { margin-top: 0.5rem; }
+legend {
+  font-size: 0.78rem; color: var(--muted-foreground); font-weight: 500;
+  padding: 0 0.35rem; white-space: nowrap;
+}
 .actions { display: flex; justify-content: flex-end; gap: 0.6rem; }
