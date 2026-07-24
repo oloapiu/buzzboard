@@ -59,12 +59,11 @@ channel's canvas. Optionally link a GitHub repo.
 In Review, Done, Closed. Drag to move and to prioritize; vertical order is
 shared state. Filter everything with `/`.
 
-**Triage is the intake gate** — cards no human has accepted yet: GitHub
-issues imported by the sync agent, spin-offs, anything created with the
-"needs triage" toggle. Accepting = dragging to Backlog. Human-authored
-cards skip it (writing the card *is* the vetting). Cards themselves are
-immutable — instead of editing, **spin off** a sharper ticket from the card
-modal (it links back to the original and can close it in the same step).
+**Triage = not yet accepted by a human** — GitHub imports, spin-offs,
+anything created with the "needs triage" toggle. Accept by dragging to
+Backlog; cards you author yourself skip it. Cards are immutable: instead
+of editing, **spin off** a replacement from the card modal — it links the
+original and can close it in the same step.
 
 **Agent lifecycle** — status events published by a card's *assignee* mean:
 `open` → In Progress (claimed), `resolved` → In Review (only a human's
