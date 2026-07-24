@@ -1,160 +1,147 @@
 # buzzboard
 
-A Trello-style kanban for [buzz](https://github.com/block/buzz) communities,
-with AI agents as first-class assignees. Swimlanes are channels, cards are
-NIP-34 issues, and assigning a card to an agent posts the chat mention that
-wakes it via buzz-acp — the agent then moves its own card by publishing
-status events through the `buzz` CLI.
+A kanban for [buzz](https://github.com/block/buzz) communities where AI agents
+are teammates: assign a card to an agent, it wakes up in chat, does the work,
+reports in a thread, and moves its own card.
 
-**Local-first, zero server, zero local state.** buzzboard is a static
-single-page app. Every colleague runs their own copy with their own Nostr
-key; all shared state lives on the community's relay as signed events, so
-every instance renders the identical board. Access control is the relay's:
-if your key isn't a member of the community, you see nothing.
+[![ci](https://github.com/oloapiu/buzzboard/actions/workflows/ci.yml/badge.svg)](https://github.com/oloapiu/buzzboard/actions/workflows/ci.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![built on buzz](https://img.shields.io/badge/built%20on-buzz-8839ef.svg)](https://github.com/block/buzz)
 
+- **Agents are assignees.** Assigning a card posts a chat mention that wakes
+  the agent (via buzz-acp). It claims the card, works, and moves it through
+  the lifecycle itself by publishing NIP-34 status events — including
+  flagging itself **blocked** when it needs a human.
+- **The relay is the only backend.** Lanes, cards, ordering, assignments —
+  everything is signed Nostr events on your community's relay. The board is
+  a static page: no server, no database, no accounts.
+- **Local-first, multi-user.** Every teammate runs their own copy with their
+  own key. Access control is community membership, enforced by the relay.
+  What one person drags, everyone sees on the next poll.
 
-## Run
+**Status: early prototype.** It works end-to-end against a real community,
+but the board-side protocol conventions (documented below) may still shift.
+
+## Quickstart
 
 ```bash
-cd spa
+git clone https://github.com/oloapiu/buzzboard && cd buzzboard/spa
 npm install
 npm run dev        # http://localhost:8401
 ```
 
-Connect with your relay URL and private key (nsec or hex — get yours from
-Buzz desktop → Settings → Profile → "Reveal private key"). The key never
-leaves your browser (localStorage); events are signed client-side and sent
-to the relay's HTTP bridge (`POST /query`, `POST /events`) with per-request
-NIP-98 auth, exactly like `buzz-cli`.
+Connect with your community's relay URL and your Nostr key (nsec or hex —
+Buzz desktop shows it under Settings → Profile → "Reveal private key"). The
+key stays in your browser; events are signed client-side and sent to the
+relay's HTTP bridge with per-request NIP-98 auth, exactly like `buzz-cli`.
 
 ## Concepts
 
-**Swimlane** — a lane groups cards and owns a channel where its agent
-dispatch and discussion happen. "+ New swimlane" creates the channel
-(kind 9007), adds the agents you pick as `bot` members (kind 9000), writes
-an "Open buzzboard" link into the channel's canvas, and publishes the lane
-record. Optionally link a GitHub repo; the lane then shows a GitHub chip
-(and is ready for a sync agent — roadmap).
+**Swimlane** — a lane groups cards and owns a buzz channel where its agent
+dispatch and discussion happen. Creating a lane creates the channel, staffs
+it with the agents you pick, and drops an "Open buzzboard" link into the
+channel's canvas. Optionally link a GitHub repo.
 
-**GitHub sync (optional, per lane)** — when creating a GitHub-linked lane,
-tick "Ask an agent to keep GitHub issues in sync" and pick one of your
-agents. The agent is added to the lane channel and briefed there with
-standing duties: mirror new cards to GitHub issues, sync Done/Closed in
-both directions, import GitHub-originated issues as cards, and reconcile
-on demand (mention it with "sync"). It uses **its own machine's `gh`
-login — the board never stores a GitHub token.** Cross-links are the
-mapping: `buzz:<issue-id>` markers in GitHub issue bodies, and
-`GitHub: <url>` recorded in NIP-34 status-event content on the buzz side
-(rendered as a GH↗ chip on the card). The sync agent counts as a status
-actor for the lane's cards — tagging it on the lane record is the owner
-delegating that authority, so GitHub-side closes can move cards.
+**Card** — a NIP-34 git issue. Columns: Triage, Backlog, In Progress,
+In Review, Done, Closed. Drag to move and to prioritize; vertical order is
+shared state. Filter everything with `/`.
 
-**Card** — a NIP-34 git issue. Six columns: Triage, Backlog, In Progress,
-In Review, Done, Closed. Drag within a lane to move and to prioritize
-(vertical order is shared). Cards can't move across lanes — their repo
-reference is immutable.
+**Agent lifecycle** — status events published by a card's *assignee* mean:
+`open` → In Progress (claimed), `resolved` → In Review (only a human's
+resolved means Done — agents don't close their own work), `draft` →
+In Review with a **⚠ blocked** badge linking to the agent's thread so you
+can unblock it.
 
-**Assignment** — pick one of *your* agents (the board only offers agents
-you own; other members' agents ignore your mentions by `respond_to`
-policy). With dispatch enabled, the board posts an instruction message in
-the lane channel: how to read the issue, and that `--status open` = claimed,
-`--status resolved` = ready for review, `--status draft` = blocked. Agents
-not in the lane channel are flagged — mentions can't reach them.
+**GitHub sync (optional, per lane)** — pick a sync agent and it keeps the
+lane and a GitHub repo's issues mirrored both ways, using **its own
+machine's `gh` login** — the board never holds a GitHub token. Cross-links
+(`buzz:<id>` markers on GitHub, `GitHub: <url>` in status content) are the
+mapping; mirrored cards get a GitHub chip.
 
-**Agent lifecycle** — status events published by the card's *assignee* mean:
-`open` → In Progress, `resolved` → In Review (only the author/owner's
-resolved means Done — agents never close their own work), `draft` →
-In Review with a red **⚠ blocked** badge. A blocked card's modal links the
-agent's thread so you can reply and unblock, spin a new ticket, or drag the
-card back to Backlog. Human recovery moves always win by recency.
+**Deep links both ways** — cards link into the Buzz app at the agent's
+thread (`buzz://message?…`); lane channel canvases link back to the board.
 
-## On-the-wire model
+## On the wire
 
-Everything is an event on the relay; buzzboard invents no new kinds.
+buzzboard invents no event kinds — everything rides on kinds the buzz relay
+already accepts:
 
 | Board concept | Relay representation |
 |---|---|
 | Swimlane | kind 30617 repo announcement (`d` = lane slug) |
-| Lane ↔ channel binding | `["buzz-channel", <uuid>]` on the announcement (existing buzz web-client convention) |
-| Lane ↔ GitHub binding | standard NIP-34 `["web", url]` + `["clone", url]` tags |
+| Lane ↔ channel | `["buzz-channel", <uuid>]` on the announcement |
+| Lane ↔ GitHub | standard NIP-34 `["web", url]` + `["clone", url]` tags |
 | Lane sync agent | `["sync-agent", <pubkey>]` on the announcement |
-| Card ↔ GitHub issue | `buzz:<issue-id>` marker in the GitHub issue body; `GitHub: <url>` in buzz status-event content |
 | Card | kind 1621 issue (`a` = `30617:<owner>:<lane>`, `subject`, `t` labels) |
-| Column | NIP-34 status events 1630/1631/1632/1633 (+ `t:in-progress` / `t:in-review` on 1630 — the CLI-expressible vocabulary can't say In Progress/In Review otherwise) |
-| Vertical order | `["rank", <base36>]` on the newest status event carrying one — fractional index, inserting never renumbers neighbors |
-| Assignee | `["assignee", <pubkey>]` on the newest status event carrying one |
-| Agent thread | `["dispatch", <msgId>, <channelUuid>]` on the assignment's status event → rendered as a `buzz://message?…` deep link |
-| Dispatch / wake-up | kind 9 message in the lane channel with `["p", <agent>]` |
-| Canvas board link | kind 40100 canvas: one `📋 [Open buzzboard](…)` line, merged idempotently — never clobbers human content |
+| Column | NIP-34 status kinds 1630–1633 (+ `t:in-progress` / `t:in-review` on 1630) |
+| Vertical order | `["rank", <base36 fractional index>]` on the newest status event |
+| Assignee | `["assignee", <pubkey>]` on the newest status event |
+| Agent thread | `["dispatch", <msgId>, <channelUuid>]` → `buzz://` deep link |
+| Dispatch / wake-up | kind 9 channel message with `["p", <agent>]` |
+| Canvas board link | one idempotently-merged line in the kind 40100 canvas |
 
 Derivation rules (ported from buzz desktop's `projectIssues.mjs`, extended):
 
 - **Column** counts status events only from *strict actors* — issue author,
-  repo owner, current assignee, or the lane's declared sync agent; newest
-  wins.
-- **Rank and assignee** read the newest tag from *any* member — anyone may
-  reorder or assign, but can't move a column they're not authorized for.
-- Status events are fetched by `#a` **and** `#e` — `buzz issues status`
-  omits the repo tag unless given repo flags, so agent statuses are often
-  only reachable via the issue id.
-
-## Buzz integration, both directions
-
-- **Board → buzz:** card 💬 chips and blocked notices deep-link into the
-  agent's thread (`buzz://message?…`), opening the Buzz desktop app at the
-  right spot.
-- **Buzz → board:** each lane's channel canvas carries an "Open buzzboard"
-  link (auto-written at lane creation; the 📋 chip refreshes it). It points
-  at `localhost`, which is per-viewer by design: every colleague who clicks
-  it opens *their own* local instance at that lane. Standardize on port
-  8401.
-
-## Multi-user model
-
-Give colleagues this repo. Each runs the app locally with their own key.
-There is no shared deployment, no accounts, no sync service — the relay is
-the single source of truth and its membership is the access control. What
-one person drags, everyone sees on the next 5-second poll.
+  lane owner, current assignee, or the lane's declared sync agent (an
+  owner-signed delegation); newest wins.
+- **Rank and assignee** read the newest tag from *any* member: anyone may
+  reorder or assign, but that can't move a column they're not authorized
+  for.
+- Statuses are fetched by `#a` **and** `#e` — the buzz CLI omits the repo
+  tag unless given repo flags, so agent-published statuses are often only
+  reachable via the issue id.
 
 ## Tests
 
 ```bash
-cd spa && npm test    # vitest
+cd spa && npm test    # vitest, offline, ~300 ms
 ```
 
 The domain layer is pure logic over plain event objects, so the suite runs
-against an in-memory stub relay with a real filter matcher — no mocking
-framework. Covered: rank fractional-index invariants, the full column
-derivation matrix (strict vs loose actors, assignee lifecycle, blocked,
-label fallbacks, newest-wins recovery, `#a`+`#e` status merge), sync-agent
-authority + GitHub cross-link extraction, canvas link merging, and every
-action builder's published event kinds/tags (moves, assignment + dispatch,
-card mirror requests, lane creation, channel attach). Crypto is verified
-end-to-end: event ids, BIP-340 signatures, NIP-98 headers.
+against an in-memory stub relay with a real filter matcher — covering the
+full derivation matrix, rank invariants, canvas merging, and the exact
+kinds/tags of every event the board publishes. Crypto is verified
+independently (NIP-01 ids, BIP-340 signatures, NIP-98 headers).
+
+## Contributing
+
+Issues and PRs welcome — the codebase is small (a few hundred lines of
+domain logic + a handful of React components) and the tests run offline in
+well under a second. Some concrete, sized starting points:
+
+- **Dim non-matching cards** inside lanes matched by the search filter.
+- **Playwright smoke test** for the drag/drop layer (headless tooling is
+  already half-set-up).
+- **`npx buzzboard`** — a tiny launcher that serves the built SPA and opens
+  the browser.
+- **Tauri wrapper** — OS-keychain key storage, a `buzzboard://` scheme so
+  canvas links launch the app, native notifications for blocked cards.
+- **Protocol people:** help design the upstream buzz card kind (status,
+  assignee, rank as first-class fields) that would replace the status-event
+  conventions above — this repo is effectively the design brief.
+
+Dev loop: `npm run dev`, edit, `npm test`. CI runs the suite + build on
+every PR.
 
 ## Known limitations
 
 - Issue title/body are immutable after creation (NIP-34 has no issue edit);
-  clarifications go in the dispatch thread.
-- Column moves stick only for the issue author, lane owner, or assignee.
-- The buzz desktop shows a coarser view (it doesn't know these conventions):
-  assignee-resolved reads as Done there, in-progress/in-review as Backlog.
-- Board writes re-derive from a 5 s poll, not live subscriptions.
-- Concurrent edits resolve by newest-event-wins; no operational transforms.
-
-- GitHub sync is best-effort/eventually-consistent: it depends on the sync
-  agent being online, and everything it mirrors to GitHub is authored as
-  its owner's GitHub identity.
+  clarifications go in the agent thread.
+- Column moves stick only for the issue author, lane owner, assignee, or
+  sync agent.
+- The buzz desktop shows a coarser view of board-extension states (it
+  doesn't know these conventions yet).
+- Realtime is a 5-second poll, not a subscription.
+- Concurrent edits resolve newest-wins; GitHub sync is best-effort and
+  depends on the sync agent being online.
 
 ## Roadmap
 
-- **Tauri wrapper:** signed app bundle, key in the OS keychain, a
-  `buzzboard://` scheme so canvas links launch the app.
-- **Relay-served bundle:** the relay already multiplexes SPA bundles; a
-  small upstream PR could serve the board at `https://<relay>/board`.
-- **Upstream card kind:** a proper addressable card event (status, assignee,
-  rank as first-class fields) would replace the status-event conventions —
-  this prototype is the design brief for that PR.
+- `npx buzzboard` launcher, then a Tauri desktop wrapper.
+- A relay-served bundle (`https://<relay>/board`) — the relay already
+  multiplexes SPA bundles.
+- The upstream card kind.
 
 ## License
 
