@@ -1,0 +1,4 @@
+.venv/
+data/board.db
+__pycache__/
+*.pyc

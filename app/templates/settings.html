@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>buzzboard — settings</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-800">
+  <header class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 shadow-sm">
+    <h1 class="text-lg font-bold tracking-tight">buzzboard <span class="font-normal text-slate-400">/ settings</span></h1>
+    <a href="/" class="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50">Back to board</a>
+  </header>
+
+  <main class="mx-auto mt-8 max-w-xl space-y-6 px-4 pb-16">
+    <form method="post" action="/settings" class="space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="font-semibold">Connection</h2>
+      <label class="block text-sm">
+        <span class="mb-1 block text-slate-600">Relay URL (ws:// or https://)</span>
+        <input name="relay_url" value="{{ relay_url }}" required placeholder="wss://relay.example.com"
+               class="w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm">
+      </label>
+      <label class="block text-sm">
+        <span class="mb-1 block text-slate-600">
+          Private key (nsec or hex)
+          {% if has_key %}<span class="ml-2 rounded bg-green-100 px-2 py-0.5 text-xs text-green-700">key saved — leave blank to keep</span>{% endif %}
+        </span>
+        <input name="private_key" type="password" placeholder="{{ 'unchanged' if has_key else 'nsec1…' }}"
+               class="w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm">
+        <span class="mt-1 block text-xs text-slate-400">
+          Stored in the local SQLite file (data/board.db) so the server can sign events. Prototype-grade — use a throwaway or agent key.
+        </span>
+      </label>
+      {% if identity %}
+      <p class="text-xs text-slate-500">Signing as <span class="font-mono">{{ identity }}</span></p>
+      {% endif %}
+      <label class="block text-sm">
+        <span class="mb-1 block text-slate-600">Agent dispatch channel (kind-9 assignment messages go here)</span>
+        {% if channels %}
+        <select name="dispatch_channel" class="w-full rounded border border-slate-300 px-3 py-2 text-sm">
+          <option value="">— none —</option>
+          {% for ch in channels %}
+          <option value="{{ ch.uuid }}" {% if ch.uuid == dispatch_channel %}selected{% endif %}>#{{ ch.name }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <input name="dispatch_channel" value="{{ dispatch_channel }}" placeholder="channel uuid (save connection first to pick from a list)"
+               class="w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm">
+        {% if channel_error %}<span class="mt-1 block text-xs text-red-500">couldn't load channels: {{ channel_error }}</span>{% endif %}
+        {% endif %}
+      </label>
+      <button class="rounded bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-700">Save</button>
+    </form>
+
+    {% if configured %}
+    <form method="post" action="/repos" class="space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="font-semibold">Create a repo (swimlane)</h2>
+      <p class="text-xs text-slate-500">
+        A repo announcement is just an event — no git content needed. Use this for a
+        placeholder like <span class="font-mono">misc</span> to hold tickets that belong to no codebase.
+      </p>
+      <div class="flex gap-3">
+        <input name="repo_id" required placeholder="misc" pattern="[a-zA-Z0-9._\-]{1,64}"
+               class="w-40 rounded border border-slate-300 px-3 py-2 font-mono text-sm">
+        <input name="name" placeholder="Display name (optional)"
+               class="flex-1 rounded border border-slate-300 px-3 py-2 text-sm">
+      </div>
+      <input name="description" placeholder="Description (optional)"
+             class="w-full rounded border border-slate-300 px-3 py-2 text-sm">
+      <button class="rounded bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-700">Create repo</button>
+    </form>
+    {% endif %}
+  </main>
+</body>
+</html>

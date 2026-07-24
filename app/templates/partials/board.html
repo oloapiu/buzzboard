@@ -1,0 +1,58 @@
+{% if not repos %}
+<div class="mx-auto mt-16 max-w-lg rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm">
+  <p class="text-slate-600">No repos on this relay yet.</p>
+  <p class="mt-2 text-sm text-slate-400">Create one (e.g. <span class="font-mono">misc</span>) from <a class="underline" href="/settings">settings</a>.</p>
+</div>
+{% endif %}
+
+<div class="space-y-6">
+  {% for repo in repos %}
+  <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
+    <div class="flex items-center justify-between border-b border-slate-100 px-4 py-2">
+      <div class="flex items-baseline gap-2">
+        <h2 class="font-semibold">{{ repo.name }}</h2>
+        <span class="font-mono text-xs text-slate-400">{{ repo.repo_id }}</span>
+        {% if repo.description %}<span class="text-xs text-slate-400">— {{ repo.description }}</span>{% endif %}
+      </div>
+      <button hx-get="/partials/new-card?repo={{ repo.address }}" hx-target="#modal" hx-swap="innerHTML"
+              class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">+ card</button>
+    </div>
+    <div class="grid grid-cols-6 gap-2 p-3">
+      {% for col in columns %}
+      <div class="flex min-h-[8rem] flex-col rounded bg-slate-50 p-2">
+        <div class="mb-2 flex items-center justify-between px-1">
+          <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ column_labels[col] }}</span>
+          <span class="text-xs text-slate-400">{{ cards_by_repo[repo.address] | selectattr('column', 'equalto', col) | list | length }}</span>
+        </div>
+        <div data-cell data-repo="{{ repo.address }}" data-column="{{ col }}" class="flex flex-1 flex-col gap-2">
+          {% for card in cards_by_repo[repo.address] if card.column == col %}
+          <div data-card="{{ card.id }}"
+               hx-get="/partials/card/{{ card.id }}?repo={{ repo.address }}" hx-target="#modal" hx-swap="innerHTML"
+               class="cursor-grab rounded border border-slate-200 bg-white p-2 text-sm shadow-sm hover:border-slate-300">
+            <div class="font-medium leading-snug">{{ card.subject }}</div>
+            <div class="mt-1 flex flex-wrap items-center gap-1">
+              {% if card.blocked %}
+              <span class="rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700">⚠ blocked</span>
+              {% endif %}
+              {% for label in card.labels %}
+              <span class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">{{ label }}</span>
+              {% endfor %}
+              {% if card.thread_link %}
+              <a href="{{ card.thread_link }}" onclick="event.stopPropagation()"
+                 title="Open thread in Buzz"
+                 class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-200">💬</a>
+              {% endif %}
+              {% if card.assignee %}
+              <span class="ml-auto rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700"
+                    title="{{ card.assignee }}">{{ names.get(card.assignee, card.assignee | short_pk) }}</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
