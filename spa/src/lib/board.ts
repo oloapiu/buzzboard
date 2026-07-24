@@ -367,7 +367,10 @@ export async function createLane(
   relay: Relay, signer: Signer,
   name: string, description: string, githubUrl: string,
   agentPubkeys: string[], existingChannelId: string | null,
+  boardOrigin?: string,
 ): Promise<void> {
+  const repoId = name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[.-]+|[-.]+$/g, "")
+    .slice(0, 64) || "lane";
   let channelId = existingChannelId;
   if (!channelId) {
     channelId = crypto.randomUUID();
@@ -381,9 +384,10 @@ export async function createLane(
         K.KIND_ADD_MEMBER, [["h", channelId], ["p", pk], ["role", "bot"]], "",
       ));
     }
+    if (boardOrigin) {
+      await addBoardLinkToCanvas(relay, signer, channelId, laneBoardUrl(boardOrigin, { repoId }));
+    }
   }
-  const repoId = name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[.-]+|[-.]+$/g, "")
-    .slice(0, 64) || "lane";
   const tags: string[][] = [["d", repoId], ["name", name], ["buzz-channel", channelId]];
   if (description) tags.push(["description", description]);
   if (githubUrl) {
@@ -392,6 +396,34 @@ export async function createLane(
   }
   await relay.submit(signer.signEvent(K.KIND_REPO_ANNOUNCEMENT, tags, ""));
 }
+
+// --- channel canvas board link ---
+// The lane channel's canvas (kind 40100, a human-facing markdown doc rendered
+// by the buzz desktop) gets one "Open buzzboard" line. localhost links are
+// per-viewer: each colleague's click opens their own local board instance.
+
+export function mergeBoardLink(current: string, boardUrl: string): string {
+  const line = `📋 [Open buzzboard](${boardUrl})`;
+  if (current.includes("Open buzzboard](")) {
+    return current.replace(/^.*Open buzzboard\]\(.*$/m, line);
+  }
+  return current ? `${current.trimEnd()}\n\n${line}\n` : `${line}\n`;
+}
+
+export async function addBoardLinkToCanvas(
+  relay: Relay, signer: Signer, channelId: string, boardUrl: string,
+): Promise<void> {
+  const events = await relay.query([
+    { kinds: [K.KIND_CANVAS], "#h": [channelId], limit: 1 },
+  ]);
+  const current = events[0]?.content ?? "";
+  const next = mergeBoardLink(current, boardUrl);
+  if (next === current) return;
+  await relay.submit(signer.signEvent(K.KIND_CANVAS, [["h", channelId]], next));
+}
+
+export const laneBoardUrl = (origin: string, lane: { repoId: string }): string =>
+  `${origin}/#lane-${lane.repoId}`;
 
 export async function attachChannel(
   relay: Relay, signer: Signer, lane: Lane, channelId: string,

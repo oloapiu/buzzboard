@@ -1,7 +1,8 @@
 import { useRef, useState, type MutableRefObject } from "react";
 import { COLUMNS, COLUMN_LABELS, type Column } from "./lib/kinds";
 import {
-  moveCard, type Agent, type BoardData, type Card, type Lane,
+  addBoardLinkToCanvas, laneBoardUrl, moveCard,
+  type Agent, type BoardData, type Card, type Lane,
 } from "./lib/board";
 import type { Signer } from "./lib/nostr";
 import type { Relay } from "./lib/relay";
@@ -75,7 +76,7 @@ export function Board({ data, session, refresh, busyRef }: {
         <p className="muted center">No lanes yet — create your first one.</p>
       )}
       {data.lanes.map((lane) => (
-        <section key={lane.address} className="lane">
+        <section key={lane.address} className="lane" id={`lane-${lane.repoId}`}>
           <div className="lane-head">
             <div>
               <strong>{lane.name}</strong>
@@ -87,6 +88,7 @@ export function Board({ data, session, refresh, busyRef }: {
                   no channel — attach
                 </button>
               )}
+              {lane.channelId && <CanvasLinkChip lane={lane} session={session} />}
               {lane.description && <span className="muted"> — {lane.description}</span>}
             </div>
             <button className="ghost" onClick={() => setModal({ kind: "new-card", lane })}>+ card</button>
@@ -168,6 +170,31 @@ export function Board({ data, session, refresh, busyRef }: {
                             close={() => setModal({ kind: "none" })} refresh={refresh} />
       )}
     </main>
+  );
+}
+
+function CanvasLinkChip({ lane, session }: { lane: Lane; session: Session }) {
+  const [state, setState] = useState<"idle" | "busy" | "done">("idle");
+  return (
+    <button
+      className="chip"
+      disabled={state !== "idle"}
+      title="Write an 'Open buzzboard' link into the lane channel's canvas"
+      onClick={async () => {
+        setState("busy");
+        try {
+          await addBoardLinkToCanvas(session.relay, session.signer, lane.channelId!,
+            laneBoardUrl(window.location.origin, lane));
+          setState("done");
+          setTimeout(() => setState("idle"), 2000);
+        } catch (err) {
+          setState("idle");
+          alert(String(err));
+        }
+      }}
+    >
+      {state === "done" ? "✓ canvas updated" : state === "busy" ? "…" : "📋 canvas link"}
+    </button>
   );
 }
 

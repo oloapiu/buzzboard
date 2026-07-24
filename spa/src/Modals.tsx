@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { COLUMNS, COLUMN_LABELS, type Column } from "./lib/kinds";
 import {
-  assignCard, attachChannel, createCard, createLane, fetchMyChannels, moveCard,
+  addBoardLinkToCanvas, assignCard, attachChannel, createCard, createLane,
+  fetchMyChannels, laneBoardUrl, moveCard,
   type Agent, type Card, type Lane,
 } from "./lib/board";
 import type { Session } from "./Board";
@@ -158,7 +159,7 @@ export function NewLaneModal({ session, agents, close, refresh }: {
       <form onSubmit={(e) => {
         e.preventDefault();
         run(() => createLane(session.relay, session.signer, name.trim(), description.trim(),
-          githubUrl.trim(), [...staff], null));
+          githubUrl.trim(), [...staff], null, window.location.origin));
       }}>
         <input autoFocus required placeholder="Lane name" value={name}
                onChange={(e) => setName(e.target.value)} />
@@ -219,7 +220,11 @@ export function AttachChannelModal({ lane, session, close, refresh }: {
       <div className="actions">
         <button className="ghost" onClick={close}>Cancel</button>
         <button disabled={busy || !choice}
-                onClick={() => run(() => attachChannel(session.relay, session.signer, lane, choice))}>
+                onClick={() => run(async () => {
+                  await attachChannel(session.relay, session.signer, lane, choice);
+                  await addBoardLinkToCanvas(session.relay, session.signer, choice,
+                    laneBoardUrl(window.location.origin, lane));
+                })}>
           Attach
         </button>
       </div>

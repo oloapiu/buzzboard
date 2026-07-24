@@ -7,6 +7,7 @@ export const KIND_STATUS_CLOSED = 1632;
 export const KIND_STATUS_DRAFT = 1633;
 export const KIND_CREATE_CHANNEL = 9007;
 export const KIND_ADD_MEMBER = 9000;
+export const KIND_CANVAS = 40100;
 export const KIND_MANAGED_AGENT = 30177;
 export const KIND_AGENT_PROFILE = 10100;
 export const KIND_REPO_ANNOUNCEMENT = 30617;
