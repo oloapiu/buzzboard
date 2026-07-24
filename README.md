@@ -38,6 +38,19 @@ an "Open buzzboard" link into the channel's canvas, and publishes the lane
 record. Optionally link a GitHub repo; the lane then shows a GitHub chip
 (and is ready for a sync agent — roadmap).
 
+**GitHub sync (optional, per lane)** — when creating a GitHub-linked lane,
+tick "Ask an agent to keep GitHub issues in sync" and pick one of your
+agents. The agent is added to the lane channel and briefed there with
+standing duties: mirror new cards to GitHub issues, sync Done/Closed in
+both directions, import GitHub-originated issues as cards, and reconcile
+on demand (mention it with "sync"). It uses **its own machine's `gh`
+login — the board never stores a GitHub token.** Cross-links are the
+mapping: `buzz:<issue-id>` markers in GitHub issue bodies, and
+`GitHub: <url>` recorded in NIP-34 status-event content on the buzz side
+(rendered as a GH↗ chip on the card). The sync agent counts as a status
+actor for the lane's cards — tagging it on the lane record is the owner
+delegating that authority, so GitHub-side closes can move cards.
+
 **Card** — a NIP-34 git issue. Six columns: Triage, Backlog, In Progress,
 In Review, Done, Closed. Drag within a lane to move and to prioritize
 (vertical order is shared). Cards can't move across lanes — their repo
@@ -66,6 +79,8 @@ Everything is an event on the relay; buzzboard invents no new kinds.
 | Swimlane | kind 30617 repo announcement (`d` = lane slug) |
 | Lane ↔ channel binding | `["buzz-channel", <uuid>]` on the announcement (existing buzz web-client convention) |
 | Lane ↔ GitHub binding | standard NIP-34 `["web", url]` + `["clone", url]` tags |
+| Lane sync agent | `["sync-agent", <pubkey>]` on the announcement |
+| Card ↔ GitHub issue | `buzz:<issue-id>` marker in the GitHub issue body; `GitHub: <url>` in buzz status-event content |
 | Card | kind 1621 issue (`a` = `30617:<owner>:<lane>`, `subject`, `t` labels) |
 | Column | NIP-34 status events 1630/1631/1632/1633 (+ `t:in-progress` / `t:in-review` on 1630 — the CLI-expressible vocabulary can't say In Progress/In Review otherwise) |
 | Vertical order | `["rank", <base36>]` on the newest status event carrying one — fractional index, inserting never renumbers neighbors |
@@ -77,7 +92,8 @@ Everything is an event on the relay; buzzboard invents no new kinds.
 Derivation rules (ported from buzz desktop's `projectIssues.mjs`, extended):
 
 - **Column** counts status events only from *strict actors* — issue author,
-  repo owner, or current assignee; newest wins.
+  repo owner, current assignee, or the lane's declared sync agent; newest
+  wins.
 - **Rank and assignee** read the newest tag from *any* member — anyone may
   reorder or assign, but can't move a column they're not authorized for.
 - Status events are fetched by `#a` **and** `#e` — `buzz issues status`
@@ -112,11 +128,12 @@ one person drags, everyone sees on the next 5-second poll.
 - Board writes re-derive from a 5 s poll, not live subscriptions.
 - Concurrent edits resolve by newest-event-wins; no operational transforms.
 
+- GitHub sync is best-effort/eventually-consistent: it depends on the sync
+  agent being online, and everything it mirrors to GitHub is authored as
+  its owner's GitHub identity.
+
 ## Roadmap
 
-- **GitHub sync agent:** lanes with a GitHub link get a `sync-agent`
-  binding; the agent (using its owner's `gh` auth — the board never holds a
-  PAT) mirrors cards to GitHub issues and reconciles drift on heartbeat.
 - **Tauri wrapper:** signed app bundle, key in the OS keychain, a
   `buzzboard://` scheme so canvas links launch the app.
 - **Relay-served bundle:** the relay already multiplexes SPA bundles; a

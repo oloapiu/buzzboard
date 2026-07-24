@@ -133,6 +133,11 @@ export function Board({ data, session, refresh, busyRef }: {
                             <a href={card.threadLink} className="badge link"
                                onClick={(e) => e.stopPropagation()} title="Open thread in Buzz">💬</a>
                           )}
+                          {card.githubIssueUrl && (
+                            <a href={card.githubIssueUrl} className="badge link" target="_blank"
+                               rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                               title="Mirrored GitHub issue">GH↗</a>
+                          )}
                           {card.assignee && (
                             <span className="badge assignee" title={card.assignee}>
                               {nameOf(card.assignee)}
@@ -159,6 +164,7 @@ export function Board({ data, session, refresh, busyRef }: {
       )}
       {modal.kind === "new-card" && (
         <NewCardModal lane={modal.lane} session={session}
+                      syncAgentName={modal.lane.syncAgent ? nameOf(modal.lane.syncAgent) : undefined}
                       close={() => setModal({ kind: "none" })} refresh={refresh} />
       )}
       {modal.kind === "new-lane" && (

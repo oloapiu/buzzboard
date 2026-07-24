@@ -27,7 +27,12 @@ export interface Lane {
   description: string;
   channelId: string | null;
   githubUrl: string | null;
+  syncAgent: string | null;
 }
+
+/** "https://github.com/owner/repo[...]" -> "owner/repo" */
+export const githubSlug = (url: string): string | null =>
+  url.match(/github\.com\/([^/\s]+\/[^/\s#?]+)/)?.[1]?.replace(/\.git$/, "") ?? null;
 
 export interface Card {
   id: string;
@@ -42,6 +47,7 @@ export interface Card {
   rank: string | null;
   assignee: string | null;
   threadLink: string | null;
+  githubIssueUrl: string | null;
 }
 
 export interface Agent {
@@ -95,7 +101,10 @@ const columnFromLabels = (labels: string[]): Column | null => {
   return null;
 };
 
-function deriveCard(issue: SignedEvent, statuses: SignedEvent[], names: Set<string>): Card {
+function deriveCard(
+  issue: SignedEvent, statuses: SignedEvent[], names: Set<string>,
+  syncAgent: string | null,
+): Card {
   const referencing = statuses
     .filter((ev) => ev.tags.some((t) => t[0] === "e" && t[1] === issue.id))
     .sort(newestFirst);
@@ -111,11 +120,20 @@ function deriveCard(issue: SignedEvent, statuses: SignedEvent[], names: Set<stri
     .find((ev) => ev.tags.some((t) => t[0] === "dispatch" && t.length >= 3))
     ?.tags.find((t) => t[0] === "dispatch");
 
-  // column: strict actors only
+  // column: strict actors only — the lane's declared sync agent counts,
+  // because tagging it on the announcement is the owner delegating status
+  // authority (GitHub-side closes must be able to move cards)
   const actors = new Set([issue.pubkey.toLowerCase()]);
   const owner = repoOwner(tagValue(issue, "a"));
   if (owner) actors.add(owner);
   if (assignee) actors.add(assignee.toLowerCase());
+  if (syncAgent) actors.add(syncAgent.toLowerCase());
+
+  // GitHub cross-link: sync agent records it in status-event content
+  const githubIssueUrl =
+    referencing
+      .map((ev) => ev.content.match(/https:\/\/github\.com\/\S+\/issues\/\d+/)?.[0])
+      .find(Boolean) ?? null;
   const statusEvent = referencing.find((ev) => actors.has(ev.pubkey.toLowerCase())) ?? null;
 
   let column: Column = "backlog";
@@ -159,6 +177,7 @@ function deriveCard(issue: SignedEvent, statuses: SignedEvent[], names: Set<stri
     rank,
     assignee,
     threadLink: dispatchTag ? `buzz://message?channel=${dispatchTag[2]}&id=${dispatchTag[1]}` : null,
+    githubIssueUrl,
   };
 }
 
@@ -187,6 +206,7 @@ export async function fetchBoard(relay: Relay, myPubkey: string): Promise<BoardD
         description: tagValue(ev, "description") ?? "",
         channelId: tagValue(ev, "buzz-channel") ?? null,
         githubUrl: tagValue(ev, "web") ?? null,
+        syncAgent: tagValue(ev, "sync-agent") ?? null,
       }];
     })
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -207,10 +227,13 @@ export async function fetchBoard(relay: Relay, myPubkey: string): Promise<BoardD
       : [];
     const statuses = [...new Map([...byA, ...byE].map((ev) => [ev.id, ev])).values()];
 
+    const laneByAddress = new Map(lanes.map((l) => [l.address, l]));
     for (const issue of issues) {
       const address = tagValue(issue, "a");
       if (address && cards.has(address)) {
-        cards.get(address)!.push(deriveCard(issue, statuses, nameWanted));
+        cards.get(address)!.push(
+          deriveCard(issue, statuses, nameWanted, laneByAddress.get(address)?.syncAgent ?? null),
+        );
       }
     }
     for (const list of cards.values()) list.sort(cardOrder);
@@ -317,10 +340,30 @@ function statusTags(card: Card, lane: Lane, extra: string[][]): string[][] {
 export async function createCard(
   relay: Relay, signer: Signer, lane: Lane,
   subject: string, body: string, labels: string[],
+  syncAgentName?: string,
 ): Promise<void> {
   const tags: string[][] = [["a", lane.address], ["p", lane.owner], ["subject", subject]];
   for (const label of labels) tags.push(["t", label]);
-  await relay.submit(signer.signEvent(K.KIND_GIT_ISSUE, tags, body));
+  const issue = signer.signEvent(K.KIND_GIT_ISSUE, tags, body);
+  await relay.submit(issue);
+
+  // synced lane: ask the sync agent to mirror the new card to GitHub
+  const slug = lane.githubUrl ? githubSlug(lane.githubUrl) : null;
+  if (lane.syncAgent && lane.channelId && slug) {
+    const content =
+      `@${syncAgentName ?? "sync-agent"} new card in ${lane.name}: **${subject}** ` +
+      `(issue \`${issue.id}\`).\n` +
+      `Mirror it to GitHub (\`${slug}\`): read it with \`buzz issues get --event ${issue.id}\`, ` +
+      `create the matching GitHub issue with \`gh issue create -R ${slug}\` and include ` +
+      `\`buzz:${issue.id}\` in the GitHub issue body, then record the cross-link with ` +
+      `\`buzz issues status --issue ${issue.id} --status open --content "GitHub: <github-issue-url>"\`. ` +
+      `Skip if a GitHub issue containing that marker already exists.`;
+    await relay.submit(signer.signEvent(
+      K.KIND_STREAM_MESSAGE,
+      [["h", lane.channelId], ["p", lane.syncAgent]],
+      content,
+    ));
+  }
 }
 
 export async function moveCard(
@@ -363,11 +406,40 @@ export async function assignCard(
   await relay.submit(signer.signEvent(kind, tags, ""));
 }
 
+function syncInstruction(
+  agentName: string, laneName: string, slug: string,
+  repoOwner: string, repoId: string,
+): string {
+  return (
+    `@${agentName} you are the **GitHub sync agent** for the "${laneName}" lane ` +
+    `(buzz repo \`30617:${repoOwner}:${repoId}\` ↔ GitHub \`${slug}\`). Your standing duties:\n\n` +
+    `1. **Board → GitHub**: when asked to mirror a card (you'll be mentioned), create the ` +
+    `matching GitHub issue via \`gh issue create -R ${slug}\`, always including the marker ` +
+    `\`buzz:<issue-id>\` in the GitHub issue body. Then record the cross-link on the buzz side: ` +
+    `\`buzz issues status --issue <issue-id> --status open --content "GitHub: <github-issue-url>"\`.\n` +
+    `2. **State sync**: when a mirrored card reaches Done or Closed on the board (its buzz issue ` +
+    `gets status resolved/closed), close the GitHub issue with \`gh issue close\`; reopen on the ` +
+    `reverse. When a mirrored GitHub issue is closed on GitHub, run ` +
+    `\`buzz issues status --issue <issue-id> --status resolved --content "GitHub: <url>"\`.\n` +
+    `3. **GitHub → board**: when a GitHub issue exists with no \`buzz:\` marker and no matching ` +
+    `card, create the card: \`buzz issues create --repo-owner ${repoOwner} --repo-id ${repoId} ` +
+    `--title "<gh title>" --content "<gh body>\\n\\nGitHub: <url>"\`, then add the ` +
+    `\`buzz:<new-issue-id>\` marker to the GitHub issue body via \`gh issue edit\`.\n` +
+    `4. **Reconcile**: whenever you're mentioned with the word "sync" (or on your heartbeat), ` +
+    `diff \`gh issue list -R ${slug} --state all\` against \`buzz issues list ` +
+    `--repo-owner ${repoOwner} --repo-id ${repoId}\` and repair both directions.\n\n` +
+    `Match strictly by the \`buzz:<issue-id>\` markers and "GitHub: <url>" cross-links — never ` +
+    `create a mirror twice. Reply in this thread with a short report after each sync pass.`
+  );
+}
+
 export async function createLane(
   relay: Relay, signer: Signer,
   name: string, description: string, githubUrl: string,
   agentPubkeys: string[], existingChannelId: string | null,
   boardOrigin?: string,
+  syncAgent?: string | null,
+  syncAgentName?: string,
 ): Promise<void> {
   const repoId = name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[.-]+|[-.]+$/g, "")
     .slice(0, 64) || "lane";
@@ -388,13 +460,24 @@ export async function createLane(
       await addBoardLinkToCanvas(relay, signer, channelId, laneBoardUrl(boardOrigin, { repoId }));
     }
   }
+  const slug = githubUrl ? githubSlug(githubUrl) : null;
   const tags: string[][] = [["d", repoId], ["name", name], ["buzz-channel", channelId]];
   if (description) tags.push(["description", description]);
   if (githubUrl) {
     tags.push(["web", githubUrl]);
     tags.push(["clone", `${githubUrl.replace(/\/+$/, "")}.git`]);
   }
+  if (syncAgent && slug) tags.push(["sync-agent", syncAgent]);
   await relay.submit(signer.signEvent(K.KIND_REPO_ANNOUNCEMENT, tags, ""));
+
+  if (syncAgent && slug) {
+    await relay.submit(signer.signEvent(
+      K.KIND_STREAM_MESSAGE,
+      [["h", channelId], ["p", syncAgent]],
+      syncInstruction(syncAgentName ?? "sync-agent", name, slug,
+        signer.pubkey, repoId),
+    ));
+  }
 }
 
 // --- channel canvas board link ---
@@ -431,6 +514,7 @@ export async function attachChannel(
   const tags: string[][] = [["d", lane.repoId], ["name", lane.name], ["buzz-channel", channelId]];
   if (lane.description) tags.push(["description", lane.description]);
   if (lane.githubUrl) tags.push(["web", lane.githubUrl]);
+  if (lane.syncAgent) tags.push(["sync-agent", lane.syncAgent]);
   await relay.submit(signer.signEvent(K.KIND_REPO_ANNOUNCEMENT, tags, ""));
 }
 

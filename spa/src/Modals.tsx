@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { COLUMNS, COLUMN_LABELS, type Column } from "./lib/kinds";
 import {
   addBoardLinkToCanvas, assignCard, attachChannel, createCard, createLane,
-  fetchMyChannels, laneBoardUrl, moveCard,
+  fetchMyChannels, githubSlug, laneBoardUrl, moveCard,
   type Agent, type Card, type Lane,
 } from "./lib/board";
 import type { Session } from "./Board";
@@ -33,8 +33,9 @@ function useAction(close: () => void, refresh: () => Promise<void>) {
   return { busy, error, run };
 }
 
-export function NewCardModal({ lane, session, close, refresh }: {
-  lane: Lane; session: Session; close: () => void; refresh: () => Promise<void>;
+export function NewCardModal({ lane, session, syncAgentName, close, refresh }: {
+  lane: Lane; session: Session; syncAgentName?: string;
+  close: () => void; refresh: () => Promise<void>;
 }) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -43,10 +44,13 @@ export function NewCardModal({ lane, session, close, refresh }: {
   return (
     <Overlay close={close}>
       <h2>New card in {lane.name}</h2>
+      {lane.syncAgent && (
+        <p className="muted">This lane is GitHub-synced — the sync agent will be asked to mirror the card.</p>
+      )}
       <form onSubmit={(e) => {
         e.preventDefault();
         run(() => createCard(session.relay, session.signer, lane, subject.trim(), body,
-          labels.split(",").map((l) => l.trim()).filter(Boolean)));
+          labels.split(",").map((l) => l.trim()).filter(Boolean), syncAgentName));
       }}>
         <input autoFocus required placeholder="Title" value={subject}
                onChange={(e) => setSubject(e.target.value)} />
@@ -95,6 +99,11 @@ export function CardModal({ card, lane, session, agents, nameOf, close, refresh 
       {card.body && <pre className="body">{card.body}</pre>}
       {card.threadLink && !card.blocked && (
         <p><a href={card.threadLink}>💬 Open the agent thread in Buzz</a></p>
+      )}
+      {card.githubIssueUrl && (
+        <p><a href={card.githubIssueUrl} target="_blank" rel="noreferrer">
+          GH↗ Mirrored GitHub issue
+        </a></p>
       )}
 
       <div className="row">
@@ -148,7 +157,11 @@ export function NewLaneModal({ session, agents, close, refresh }: {
   const [description, setDescription] = useState("");
   const [githubUrl, setGithubUrl] = useState("");
   const [staff, setStaff] = useState<Set<string>>(new Set());
+  const [syncEnabled, setSyncEnabled] = useState(false);
+  const [syncAgent, setSyncAgent] = useState("");
   const { busy, error, run } = useAction(close, refresh);
+  const githubLinked = Boolean(githubSlug(githubUrl.trim() || ""));
+  const syncing = githubLinked && syncEnabled && syncAgent;
   return (
     <Overlay close={close}>
       <h2>New swimlane</h2>
@@ -158,8 +171,12 @@ export function NewLaneModal({ session, agents, close, refresh }: {
       </p>
       <form onSubmit={(e) => {
         e.preventDefault();
+        // the sync agent must be in the lane channel to receive its duties
+        const staffed = syncing ? new Set(staff).add(syncAgent) : staff;
         run(() => createLane(session.relay, session.signer, name.trim(), description.trim(),
-          githubUrl.trim(), [...staff], null, window.location.origin));
+          githubUrl.trim(), [...staffed], null, window.location.origin,
+          syncing ? syncAgent : null,
+          syncing ? agents.find((a) => a.pubkey === syncAgent)?.name : undefined));
       }}>
         <input autoFocus required placeholder="Lane name" value={name}
                onChange={(e) => setName(e.target.value)} />
@@ -167,6 +184,31 @@ export function NewLaneModal({ session, agents, close, refresh }: {
                onChange={(e) => setDescription(e.target.value)} />
         <input placeholder="GitHub repo URL (optional)" value={githubUrl}
                onChange={(e) => setGithubUrl(e.target.value)} />
+        {githubLinked && (
+          <fieldset>
+            <legend>GitHub sync</legend>
+            <label className="check">
+              <input type="checkbox" checked={syncEnabled}
+                     onChange={(e) => setSyncEnabled(e.target.checked)} />
+              Ask an agent to keep GitHub issues in sync with this lane
+            </label>
+            {syncEnabled && (
+              <>
+                <select value={syncAgent} onChange={(e) => setSyncAgent(e.target.value)}>
+                  <option value="">— pick the sync agent —</option>
+                  {agents.map((a) => (
+                    <option key={a.pubkey} value={a.pubkey}>🤖 {a.name}</option>
+                  ))}
+                </select>
+                <p className="muted">
+                  The agent mirrors cards to GitHub issues and back using its own machine's
+                  `gh` login — the board never stores a GitHub token. It'll be added to the
+                  lane channel and briefed there.
+                </p>
+              </>
+            )}
+          </fieldset>
+        )}
         {agents.length > 0 && (
           <fieldset>
             <legend>Staff the lane (adds agents to its channel)</legend>
