@@ -1,4 +1,4 @@
-import { useRef, useState, type MutableRefObject } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { COLUMNS, COLUMN_LABELS, type Column } from "./lib/kinds";
 import {
   addBoardLinkToCanvas, laneBoardUrl, moveCard,
@@ -7,6 +7,7 @@ import {
 import { rankBetween } from "./lib/rank";
 import {
   AlertIcon, BotIcon, CheckIcon, ClipboardIcon, GithubIcon, MessageIcon, PlusIcon,
+  SearchIcon, XIcon,
 } from "./Icons";
 import type { Signer } from "./lib/nostr";
 import type { Relay } from "./lib/relay";
@@ -33,7 +34,25 @@ export function Board({ data, session, refresh, busyRef, optimisticMove }: {
 }) {
   const [modal, setModalState] = useState<Modal>({ kind: "none" });
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const dragging = useRef<{ cardId: string; lane: string } | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target as HTMLElement).tagName);
+      if (e.key === "/" && !typing) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === "Escape" && e.target === searchRef.current) {
+        setQuery("");
+        searchRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
 
   const setModal = (m: Modal) => {
     busyRef.current = m.kind !== "none";
@@ -44,6 +63,21 @@ export function Board({ data, session, refresh, busyRef, optimisticMove }: {
     if (!pk) return "";
     return data.names.get(pk.toLowerCase()) ?? pk.slice(0, 8);
   };
+
+  const q = query.trim().toLowerCase();
+  const laneMatches = (lane: Lane): boolean => {
+    if (!q) return true;
+    if ([lane.name, lane.repoId, lane.description].some((s) => s.toLowerCase().includes(q))) {
+      return true;
+    }
+    return (data.cards.get(lane.address) ?? []).some(
+      (c) =>
+        c.subject.toLowerCase().includes(q) ||
+        c.labels.some((l) => l.toLowerCase().includes(q)) ||
+        (c.assignee ? nameOf(c.assignee).toLowerCase().includes(q) : false),
+    );
+  };
+  const visibleLanes = data.lanes.filter(laneMatches);
 
   function onDrop(lane: Lane, column: Column, e: React.DragEvent) {
     e.preventDefault();
@@ -81,10 +115,37 @@ export function Board({ data, session, refresh, busyRef, optimisticMove }: {
 
   return (
     <main className="board">
+      {data.lanes.length > 0 && (
+        <div className="board-toolbar">
+          <div className="search">
+            <SearchIcon />
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter lanes and cards…  ( / )"
+              aria-label="Filter swimlanes"
+            />
+            {query && (
+              <button className="icon-btn sm" title="Clear" onClick={() => setQuery("")}>
+                <XIcon />
+              </button>
+            )}
+          </div>
+          {q && (
+            <span className="muted">
+              {visibleLanes.length} of {data.lanes.length} lanes
+            </span>
+          )}
+        </div>
+      )}
       {data.lanes.length === 0 && (
         <p className="muted center">No lanes yet — create your first one.</p>
       )}
-      {data.lanes.map((lane) => (
+      {data.lanes.length > 0 && visibleLanes.length === 0 && (
+        <p className="muted center">No lanes or cards match “{query}”.</p>
+      )}
+      {visibleLanes.map((lane) => (
         <section key={lane.address} className="lane" id={`lane-${lane.repoId}`}>
           <div className="lane-head">
             <div className="lane-info">

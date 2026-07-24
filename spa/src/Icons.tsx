@@ -71,6 +71,13 @@ export const PlusIcon = () => (
   <svg {...base}><path d="M5 12h14" /><path d="M12 5v14" /></svg>
 );
 
+export const SearchIcon = () => (
+  <svg {...base}>
+    <circle cx="11" cy="11" r="8" />
+    <path d="m21 21-4.3-4.3" />
+  </svg>
+);
+
 export const UsersIcon = () => (
   <svg {...base}>
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />

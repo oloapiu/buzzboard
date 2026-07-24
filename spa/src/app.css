@@ -191,6 +191,17 @@ svg { width: 1em; height: 1em; flex-shrink: 0; }
 
 /* --- board --- */
 .board { padding: 1.1rem; display: grid; gap: 1.1rem; }
+.board-toolbar { display: flex; align-items: center; gap: 0.8rem; }
+.search {
+  position: relative; display: flex; align-items: center;
+  width: 100%; max-width: 22rem;
+}
+.search > svg {
+  position: absolute; left: 0.7rem; font-size: 0.9rem;
+  color: var(--faint-foreground); pointer-events: none;
+}
+.search input { padding-left: 2.1rem; padding-right: 2.1rem; }
+.search .icon-btn { position: absolute; right: 0.3rem; }
 .lane {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); overflow: hidden;
