@@ -24,7 +24,7 @@ export interface Session {
 type Modal =
   | { kind: "none" }
   | { kind: "card"; card: Card; lane: Lane }
-  | { kind: "new-card"; lane: Lane }
+  | { kind: "new-card"; lane: Lane; spinFrom?: Card }
   | { kind: "new-lane" }
   | { kind: "attach-channel"; lane: Lane }
   | { kind: "demo-thread"; card: Card };
@@ -269,6 +269,7 @@ export function Board({ data, session, refresh, busyRef, optimisticMove }: {
                    onDemoThread={session.demo
                      ? (card) => setModal({ kind: "demo-thread", card })
                      : undefined}
+                   onSpinOff={() => setModal({ kind: "new-card", lane: modal.lane, spinFrom: modal.card })}
                    close={() => setModal({ kind: "none" })} refresh={refresh} />
       )}
       {modal.kind === "demo-thread" && (
@@ -276,7 +277,7 @@ export function Board({ data, session, refresh, busyRef, optimisticMove }: {
                          close={() => setModal({ kind: "none" })} />
       )}
       {modal.kind === "new-card" && (
-        <NewCardModal lane={modal.lane} session={session}
+        <NewCardModal lane={modal.lane} session={session} spinFrom={modal.spinFrom}
                       syncAgentName={modal.lane.syncAgent ? nameOf(modal.lane.syncAgent) : undefined}
                       close={() => setModal({ kind: "none" })} refresh={refresh} />
       )}

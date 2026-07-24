@@ -34,24 +34,46 @@ function useAction(close: () => void, refresh: () => Promise<void>) {
   return { busy, error, run };
 }
 
-export function NewCardModal({ lane, session, syncAgentName, close, refresh }: {
-  lane: Lane; session: Session; syncAgentName?: string;
+export function NewCardModal({ lane, session, syncAgentName, spinFrom, close, refresh }: {
+  lane: Lane; session: Session; syncAgentName?: string; spinFrom?: Card;
   close: () => void; refresh: () => Promise<void>;
 }) {
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [subject, setSubject] = useState(spinFrom ? `Follow-up: ${spinFrom.subject}` : "");
+  const [body, setBody] = useState(
+    spinFrom
+      ? `Follow-up to "${spinFrom.subject}" (\`${spinFrom.id}\`).\n\nWhat's needed:\n`
+      : "",
+  );
   const [labels, setLabels] = useState("");
+  const [needsTriage, setNeedsTriage] = useState(Boolean(spinFrom));
+  const [closeOriginal, setCloseOriginal] = useState(Boolean(spinFrom));
   const { busy, error, run } = useAction(close, refresh);
   return (
     <Overlay close={close}>
-      <h2>New card in {lane.name}</h2>
+      <h2>{spinFrom ? "Spin off a new ticket" : `New card in ${lane.name}`}</h2>
+      {spinFrom && (
+        <p className="muted">
+          Cards are immutable — a sharper ticket replaces editing. The original stays
+          linked via its id in the description.
+        </p>
+      )}
       {lane.syncAgent && (
         <p className="muted">This lane is GitHub-synced — the sync agent will be asked to mirror the card.</p>
       )}
       <form onSubmit={(e) => {
         e.preventDefault();
-        run(() => createCard(session.relay, session.signer, lane, subject.trim(), body,
-          labels.split(",").map((l) => l.trim()).filter(Boolean), syncAgentName));
+        const parsed = labels.split(",").map((l) => l.trim()).filter(Boolean);
+        if (needsTriage && !parsed.some((l) => l.toLowerCase() === "triage")) {
+          parsed.push("triage");
+        }
+        run(async () => {
+          await createCard(session.relay, session.signer, lane, subject.trim(), body,
+            parsed, syncAgentName);
+          if (spinFrom && closeOriginal) {
+            await moveCard(session.relay, session.signer, lane, spinFrom, "closed",
+              { before: null, after: null });
+          }
+        });
       }}>
         <input autoFocus required placeholder="Title" value={subject}
                onChange={(e) => setSubject(e.target.value)} />
@@ -59,6 +81,18 @@ export function NewCardModal({ lane, session, syncAgentName, close, refresh }: {
                   onChange={(e) => setBody(e.target.value)} />
         <input placeholder="labels, comma-separated" value={labels}
                onChange={(e) => setLabels(e.target.value)} />
+        <label className="check">
+          <input type="checkbox" checked={needsTriage}
+                 onChange={(e) => setNeedsTriage(e.target.checked)} />
+          Needs triage — start in the Triage column until someone accepts it
+        </label>
+        {spinFrom && (
+          <label className="check">
+            <input type="checkbox" checked={closeOriginal}
+                   onChange={(e) => setCloseOriginal(e.target.checked)} />
+            Close the original card
+          </label>
+        )}
         {error && <div className="error">{error}</div>}
         <div className="actions">
           <button type="button" className="ghost" onClick={close}>Cancel</button>
@@ -69,11 +103,12 @@ export function NewCardModal({ lane, session, syncAgentName, close, refresh }: {
   );
 }
 
-export function CardModal({ card, lane, session, agents, nameOf, onDemoThread, close, refresh }: {
+export function CardModal({ card, lane, session, agents, nameOf, onDemoThread, onSpinOff, close, refresh }: {
   card: Card; lane: Lane; session: Session;
   agents: (Agent & { inChannel: boolean })[];
   nameOf: (pk: string | null | undefined) => string;
   onDemoThread?: (card: Card) => void;
+  onSpinOff: () => void;
   close: () => void; refresh: () => Promise<void>;
 }) {
   const [column, setColumn] = useState<Column>(card.column);
@@ -97,7 +132,10 @@ export function CardModal({ card, lane, session, agents, nameOf, onDemoThread, c
             {onDemoThread
               ? <a href="#thread" onClick={(e) => { e.preventDefault(); onDemoThread(card); }}>the Buzz thread</a>
               : <a href={card.threadLink}>the Buzz thread</a>}{" — "}</>)}
-          or spin the ask into a new ticket, or move this card back to Backlog.
+          or{" "}
+          <a href="#spin-off" onClick={(e) => { e.preventDefault(); onSpinOff(); }}>
+            spin the ask into a new ticket
+          </a>, or move this card back to Backlog.
         </div>
       )}
       {card.body && <pre className="body">{card.body}</pre>}
@@ -127,6 +165,16 @@ export function CardModal({ card, lane, session, agents, nameOf, onDemoThread, c
           Move
         </button>
       </div>
+
+      {!card.blocked && (
+        <p className="muted">
+          Need a sharper version of this ticket?{" "}
+          <a href="#spin-off" onClick={(e) => { e.preventDefault(); onSpinOff(); }}>
+            Spin off a new one
+          </a>{" "}
+          (cards are immutable).
+        </p>
+      )}
 
       <div className="row">
         <label>

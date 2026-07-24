@@ -155,7 +155,9 @@ function deriveCard(
     } else if (statusEvent.kind === K.KIND_STATUS_DRAFT) {
       column = "triage";
     } else {
-      column = statusLabels ?? columnFromLabels(tagValues(issue, "t")) ?? "backlog";
+      // an explicit open status supersedes creation-time issue labels —
+      // otherwise a card born with a `triage` label could never reach Backlog
+      column = statusLabels ?? "backlog";
     }
   } else {
     column = columnFromLabels(tagValues(issue, "t")) ?? "backlog";
@@ -423,8 +425,9 @@ function syncInstruction(
     `\`buzz issues status --issue <issue-id> --status resolved --content "GitHub: <url>"\`.\n` +
     `3. **GitHub → board**: when a GitHub issue exists with no \`buzz:\` marker and no matching ` +
     `card, create the card: \`buzz issues create --repo-owner ${repoOwner} --repo-id ${repoId} ` +
-    `--title "<gh title>" --content "<gh body>\\n\\nGitHub: <url>"\`, then add the ` +
-    `\`buzz:<new-issue-id>\` marker to the GitHub issue body via \`gh issue edit\`.\n` +
+    `--title "<gh title>" --content "<gh body>\\n\\nGitHub: <url>" --label triage\` — the ` +
+    `triage label lands imported issues in the board's Triage column for a human to accept. ` +
+    `Then add the \`buzz:<new-issue-id>\` marker to the GitHub issue body via \`gh issue edit\`.\n` +
     `4. **Reconcile**: whenever you're mentioned with the word "sync" (or on your heartbeat), ` +
     `diff \`gh issue list -R ${slug} --state all\` against \`buzz issues list ` +
     `--repo-owner ${repoOwner} --repo-id ${repoId}\` and repair both directions.\n\n` +

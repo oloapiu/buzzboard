@@ -144,6 +144,16 @@ describe("column derivation", () => {
     expect(cards[0].column).toBe("in_review");
   });
 
+  it("an explicit open status supersedes creation-time issue labels", async () => {
+    const issue = issueEvent({ labels: ["triage"] });
+    // no status yet: the triage label parks it in Triage (intake gate)
+    let r = await boardWith([laneEvent(), issue]);
+    expect(r.cards[0].column).toBe("triage");
+    // a human accepts it by moving to Backlog — the label must not pull it back
+    r = await boardWith([laneEvent(), issue, statusEvent(1630, OWNER, 200, issue.id)]);
+    expect(r.cards[0].column).toBe("backlog");
+  });
+
   it("ignores status events from strangers", async () => {
     const issue = issueEvent();
     const { cards } = await boardWith([
