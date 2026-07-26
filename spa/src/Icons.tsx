@@ -78,6 +78,14 @@ export const SearchIcon = () => (
   </svg>
 );
 
+export const TrashIcon = () => (
+  <svg {...base}>
+    <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <path d="M10 11v6" /><path d="M14 11v6" />
+  </svg>
+);
+
 export const UsersIcon = () => (
   <svg {...base}>
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
