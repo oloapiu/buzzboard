@@ -1,4 +1,5 @@
 export const KIND_PROFILE = 0;
+export const KIND_DELETION = 5;
 export const KIND_STREAM_MESSAGE = 9;
 export const KIND_GIT_ISSUE = 1621;
 export const KIND_STATUS_OPEN = 1630;

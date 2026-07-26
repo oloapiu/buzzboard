@@ -7,12 +7,12 @@ import {
 import { rankBetween } from "./lib/rank";
 import {
   AlertIcon, BotIcon, CheckIcon, ClipboardIcon, GithubIcon, MessageIcon, PlusIcon,
-  SearchIcon, XIcon,
+  SearchIcon, TrashIcon, XIcon,
 } from "./Icons";
 import type { Signer } from "./lib/nostr";
 import type { Relay } from "./lib/relay";
 import {
-  CardModal, DemoThreadModal, NewCardModal, NewLaneModal, AttachChannelModal,
+  CardModal, DemoThreadModal, NewCardModal, NewLaneModal, AttachChannelModal, DeleteLaneModal,
 } from "./Modals";
 
 export interface Session {
@@ -27,6 +27,7 @@ type Modal =
   | { kind: "new-card"; lane: Lane; spinFrom?: Card }
   | { kind: "new-lane" }
   | { kind: "attach-channel"; lane: Lane }
+  | { kind: "delete-lane"; lane: Lane }
   | { kind: "demo-thread"; card: Card };
 
 export function Board({ data, session, refresh, busyRef, optimisticMove }: {
@@ -169,6 +170,12 @@ export function Board({ data, session, refresh, busyRef, optimisticMove }: {
                       <AlertIcon />attach channel
                     </button>
                   )}
+                  {lane.owner === session.signer.pubkey && (
+                    <button className="icon-btn sm" title="Delete lane"
+                            onClick={() => setModal({ kind: "delete-lane", lane })}>
+                      <TrashIcon />
+                    </button>
+                  )}
                 </div>
               </div>
               {lane.description && <p className="lane-desc">{lane.description}</p>}
@@ -288,6 +295,11 @@ export function Board({ data, session, refresh, busyRef, optimisticMove }: {
       {modal.kind === "attach-channel" && (
         <AttachChannelModal lane={modal.lane} session={session}
                             close={() => setModal({ kind: "none" })} refresh={refresh} />
+      )}
+      {modal.kind === "delete-lane" && (
+        <DeleteLaneModal lane={modal.lane} cardCount={(data.cards.get(modal.lane.address) ?? []).length}
+                         session={session}
+                         close={() => setModal({ kind: "none" })} refresh={refresh} />
       )}
     </main>
   );

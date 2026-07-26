@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { COLUMNS, COLUMN_LABELS, type Column } from "./lib/kinds";
 import {
-  addBoardLinkToCanvas, assignCard, attachChannel, createCard, createLane,
+  addBoardLinkToCanvas, assignCard, attachChannel, createCard, createLane, deleteLane,
   fetchMyChannels, githubSlug, laneBoardUrl, moveCard,
   type Agent, type Card, type Lane,
 } from "./lib/board";
@@ -287,6 +287,37 @@ export function NewLaneModal({ session, agents, close, refresh }: {
           <button type="submit" disabled={busy}>{busy ? "Creating…" : "Create lane"}</button>
         </div>
       </form>
+    </Overlay>
+  );
+}
+
+export function DeleteLaneModal({ lane, cardCount, session, close, refresh }: {
+  lane: Lane; cardCount: number; session: Session; close: () => void; refresh: () => Promise<void>;
+}) {
+  const [confirmName, setConfirmName] = useState("");
+  const { busy, error, run } = useAction(close, refresh);
+  return (
+    <Overlay close={close}>
+      <h2>Delete {lane.name}?</h2>
+      <p className="muted">
+        This publishes a deletion request for the lane{cardCount > 0
+          ? ` and hides its ${cardCount} card${cardCount === 1 ? "" : "s"} from the board`
+          : ""}. It relies on the relay honoring NIP-09 deletes — this app will stop
+        showing the lane regardless, but the underlying events may still exist on the relay.
+        This can't be undone from here.
+      </p>
+      <label>
+        Type <strong>{lane.name}</strong> to confirm
+        <input autoFocus value={confirmName} onChange={(e) => setConfirmName(e.target.value)} />
+      </label>
+      {error && <div className="error">{error}</div>}
+      <div className="actions">
+        <button type="button" className="ghost" onClick={close}>Cancel</button>
+        <button className="pill warn" disabled={busy || confirmName !== lane.name}
+                onClick={() => run(() => deleteLane(session.relay, session.signer, lane))}>
+          {busy ? "Deleting…" : "Delete lane"}
+        </button>
+      </div>
     </Overlay>
   );
 }

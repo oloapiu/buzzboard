@@ -198,16 +198,40 @@ export const cardOrder = (a: Card, b: Card) => {
 
 // --- fetching ---
 
+// NIP-09 deletion requests (kind 5, ["a", <address>]) for repo announcements.
+// Only a deletion authored by the address's own pubkey may tombstone it —
+// otherwise anyone could hide someone else's lane by forging a kind 5.
+async function fetchTombstonedAddresses(relay: Relay, addresses: string[]): Promise<Set<string>> {
+  const deletions = await relay.query([{ kinds: [K.KIND_DELETION], "#a": addresses, limit: 500 }]);
+  const tombstoned = new Set<string>();
+  for (const ev of deletions) {
+    for (const addr of tagValues(ev, "a")) {
+      if (addr.startsWith(`30617:${ev.pubkey.toLowerCase()}:`)) tombstoned.add(addr);
+    }
+  }
+  return tombstoned;
+}
+
 export async function fetchBoard(relay: Relay, myPubkey: string): Promise<BoardData> {
   const repoEvents = latestPerCoord(
     await relay.query([{ kinds: [K.KIND_REPO_ANNOUNCEMENT], limit: 200 }]),
   );
+  const candidateAddresses = repoEvents.flatMap((ev) => {
+    const d = tagValue(ev, "d");
+    return d ? [`30617:${ev.pubkey.toLowerCase()}:${d}`] : [];
+  });
+  const tombstoned = candidateAddresses.length
+    ? await fetchTombstonedAddresses(relay, candidateAddresses)
+    : new Set<string>();
+
   const lanes: Lane[] = repoEvents
     .flatMap((ev) => {
       const d = tagValue(ev, "d");
       if (!d) return [];
+      const address = `30617:${ev.pubkey.toLowerCase()}:${d}`;
+      if (tombstoned.has(address)) return [];
       return [{
-        address: `30617:${ev.pubkey.toLowerCase()}:${d}`,
+        address,
         owner: ev.pubkey.toLowerCase(),
         repoId: d,
         name: tagValue(ev, "name") ?? d,
@@ -554,6 +578,14 @@ export async function attachChannel(
   if (lane.githubUrl) tags.push(["web", lane.githubUrl]);
   if (lane.syncAgent) tags.push(["sync-agent", lane.syncAgent]);
   await relay.submit(signer.signEvent(K.KIND_REPO_ANNOUNCEMENT, tags, ""));
+}
+
+export async function deleteLane(relay: Relay, signer: Signer, lane: Lane): Promise<void> {
+  await relay.submit(signer.signEvent(
+    K.KIND_DELETION,
+    [["a", lane.address], ["k", String(K.KIND_REPO_ANNOUNCEMENT)]],
+    "",
+  ));
 }
 
 export async function fetchMyChannels(
